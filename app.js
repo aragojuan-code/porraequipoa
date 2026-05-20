@@ -172,10 +172,10 @@ async function bootApp() {
 
     currentUser = session.user;
 
-    const profile = await fetchProfile(currentUser.id);
+    const profile = await ensureProfileForCurrentUser();
 
     if (!profile) {
-      alert("Hay sesión iniciada, pero no se encontró el perfil en public.profiles.");
+      alert("Hay sesión iniciada, pero no se pudo cargar o crear tu perfil.");
       showLogin();
       return;
     }
@@ -1054,12 +1054,12 @@ async function loginUser(event) {
 
     console.log("=== USER SET ===", currentUser.email, currentUser.id);
 
-    const profile = await fetchProfile(currentUser.id);
+    const profile = await ensureProfileForCurrentUser();
 
     console.log("=== PROFILE QUERY ===", profile);
 
     if (!profile) {
-      alert("Login correcto, pero no existe perfil en public.profiles para este usuario.");
+      alert("Login correcto, pero no se pudo cargar o crear perfil en public.profiles para este usuario.");
       return;
     }
 
