@@ -1027,14 +1027,25 @@ async function loginUser(event) {
 
     currentUser = data.user;
 
-    await loadProfile();
+    const { data: profile, error: profileError } = await sb
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .maybeSingle();
 
-    console.log("Profile after login:", currentProfile);
+    console.log("Profile after login:", { profile, profileError });
 
-    if (!currentProfile) {
-      alert("Login correcto, pero no se pudo cargar el perfil.");
+    if (profileError) {
+      alert("Error cargando perfil: " + profileError.message);
       return;
     }
+
+    if (!profile) {
+      alert("Login correcto, pero este usuario no tiene perfil en public.profiles.");
+      return;
+    }
+
+    currentProfile = profile;
 
     toast("Login correcto.");
     await loadDashboard();
@@ -1236,18 +1247,10 @@ function bindEvents() {
   $("soundBtn")?.addEventListener("click", startMissionSound);
 }
 
-sb.auth.onAuthStateChange(async (event, session) => {
+sb.auth.onAuthStateChange((event, session) => {
   console.log("Auth state changed:", event, session);
 
   currentUser = session?.user || null;
-
-  if (event === "SIGNED_IN" && currentUser) {
-    await loadProfile();
-
-    if (currentProfile) {
-      await loadDashboard();
-    }
-  }
 
   if (event === "SIGNED_OUT") {
     currentUser = null;
