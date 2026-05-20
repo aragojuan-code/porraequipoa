@@ -22,6 +22,14 @@ let currentPoolMembers = [];
 let competitionsCache = [];
 let booting = false;
 
+function isCurrentPoolAdmin() {
+  return currentPoolMembers.some(
+    (member) =>
+      member.user_id === currentUser?.id &&
+      (member.role === "owner" || member.role === "admin")
+  );
+}
+
 function show(viewId) {
   [
     "landingView",
@@ -29,7 +37,9 @@ function show(viewId) {
     "dashboardView",
     "poolView",
     "betView",
-    "myBetView"
+    "myBetView",
+    "rankingView",
+    "adminResultsView"
   ].forEach((id) => {
     const el = $(id);
     if (el) el.classList.add("hidden");
@@ -376,7 +386,7 @@ async function openPool(poolId) {
 
   const { data: members, error: membersError } = await sb
     .from("pool_members")
-    .select("role, joined_at, profiles:user_id(display_name)")
+    .select("user_id, role, joined_at, profiles:user_id(display_name)")
     .eq("pool_id", poolId)
     .order("joined_at", { ascending: true });
 
@@ -434,6 +444,16 @@ async function openPool(poolId) {
         <button id="goMyBetBtn" class="secondary-btn" type="button">
           Mi apuesta
         </button>
+
+        <button id="goRankingBtn" class="secondary-btn" type="button">
+          Ranking
+        </button>
+
+        ${
+          isCurrentPoolAdmin()
+            ? `<button id="goAdminResultsBtn" class="ghost-btn" type="button">Admin resultados</button>`
+            : ""
+        }
       </div>
     </div>
 
@@ -451,7 +471,211 @@ async function openPool(poolId) {
     openMyBet(pool.id);
   });
 
+  $("goRankingBtn").addEventListener("click", () => {
+    openRanking(pool.id);
+  });
+
+  $("goAdminResultsBtn")?.addEventListener("click", () => {
+    openAdminResults(pool.id);
+  });
+
   show("poolView");
+}
+
+async function openRanking(poolId) {
+  const pool = currentPool?.id === poolId ? currentPool : await fetchPool(poolId);
+  currentPool = pool;
+
+  const { data: rankingRows, error } = await sb
+    .from("scores")
+    .select("user_id, total_points, match_points, top_scorer_points, exact_count, sign_count, profiles:user_id(display_name)")
+    .eq("pool_id", pool.id)
+    .order("total_points", { ascending: false })
+    .order("match_points", { ascending: false });
+
+  if (error) {
+    console.error("Ranking error:", error);
+    toast(error.message);
+    return;
+  }
+
+  const rows = (rankingRows || [])
+    .map((row, index) => {
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(row.profiles?.display_name || "Usuario")}</td>
+          <td><strong>${Number(row.total_points || 0)}</strong></td>
+          <td>${Number(row.match_points || 0)}</td>
+          <td>${Number(row.top_scorer_points || 0)}</td>
+          <td>${Number(row.exact_count || 0)}</td>
+          <td>${Number(row.sign_count || 0)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  $("rankingContent").innerHTML = `
+    <div class="card">
+      <div class="card-kicker">RANKING</div>
+      <h1>${escapeHtml(pool.name)}</h1>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Usuario</th>
+              <th>Total</th>
+              <th>Partidos</th>
+              <th>Pichichi</th>
+              <th>Exactos</th>
+              <th>Signos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="7">Todavía no hay puntuaciones calculadas.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  show("rankingView");
+}
+
+async function openAdminResults(poolId) {
+  const pool = currentPool?.id === poolId ? currentPool : await fetchPool(poolId);
+  currentPool = pool;
+
+  if (!isCurrentPoolAdmin()) {
+    toast("Solo owner/admin puede actualizar resultados.");
+    return;
+  }
+
+  const [{ data: matches, error: matchesError }, { data: players, error: playersError }] =
+    await Promise.all([
+      sb
+        .from("matches")
+        .select("id, home_goals, away_goals, status, home:home_team_id(name), away:away_team_id(name)")
+        .eq("competition_id", pool.competition_id)
+        .order("kickoff", { ascending: true }),
+      sb
+        .from("players")
+        .select("id, name, goals, is_top_scorer, team:team_id(name)")
+        .eq("competition_id", pool.competition_id)
+        .order("goals", { ascending: false })
+    ]);
+
+  if (matchesError || playersError) {
+    console.error("Admin resultados error:", { matchesError, playersError });
+    toast(matchesError?.message || playersError?.message || "Error cargando datos");
+    return;
+  }
+
+  const matchRows = (matches || [])
+    .map(
+      (match) => `
+      <tr data-match-id="${match.id}">
+        <td>${escapeHtml(match.home?.name || "Local")} - ${escapeHtml(match.away?.name || "Visitante")}</td>
+        <td><input class="score-input admin-home" type="number" min="0" max="30" value="${match.home_goals ?? ""}" /></td>
+        <td><input class="score-input admin-away" type="number" min="0" max="30" value="${match.away_goals ?? ""}" /></td>
+        <td>${escapeHtml(match.status || "pending")}</td>
+      </tr>
+    `
+    )
+    .join("");
+
+  const playerRows = (players || [])
+    .map(
+      (player) => `
+      <tr data-player-id="${player.id}">
+        <td>${escapeHtml(player.name)}</td>
+        <td>${escapeHtml(player.team?.name || "")}</td>
+        <td><input class="score-input admin-goals" type="number" min="0" max="30" value="${player.goals ?? 0}" /></td>
+        <td>${player.is_top_scorer ? "✅" : "—"}</td>
+      </tr>
+    `
+    )
+    .join("");
+
+  $("adminResultsContent").innerHTML = `
+    <div class="card">
+      <div class="card-kicker">ADMIN RESULTADOS</div>
+      <h1>${escapeHtml(pool.name)}</h1>
+      <p class="muted">Actualiza marcadores reales y goles de jugadores. Al guardar, se recalcula el ranking.</p>
+      <button id="saveAdminResultsBtn" class="primary-btn" type="button">Guardar resultados</button>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2>Partidos</h2>
+      <div class="table-wrap"><table><thead><tr><th>Partido</th><th>Local</th><th>Visitante</th><th>Status</th></tr></thead><tbody>${matchRows}</tbody></table></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2>Goles de jugadores</h2>
+      <div class="table-wrap"><table><thead><tr><th>Jugador</th><th>Equipo</th><th>Goles</th><th>Top scorer</th></tr></thead><tbody>${playerRows}</tbody></table></div>
+    </div>
+  `;
+
+  $("saveAdminResultsBtn").addEventListener("click", () => saveAdminResults(pool));
+  show("adminResultsView");
+}
+
+async function saveAdminResults(pool) {
+  if (!isCurrentPoolAdmin()) {
+    toast("No autorizado.");
+    return;
+  }
+
+  const matchRows = Array.from(document.querySelectorAll("tr[data-match-id]"));
+  const playerRows = Array.from(document.querySelectorAll("tr[data-player-id]"));
+
+  for (const row of matchRows) {
+    const home = row.querySelector(".admin-home").value;
+    const away = row.querySelector(".admin-away").value;
+
+    if (home === "" || away === "") continue;
+
+    const { error } = await sb.rpc("update_match_result", {
+      match_uuid: row.dataset.matchId,
+      home_score: Number(home),
+      away_score: Number(away)
+    });
+
+    if (error) {
+      console.error("update_match_result error:", error);
+      toast(error.message);
+      return;
+    }
+  }
+
+  for (const row of playerRows) {
+    const goals = row.querySelector(".admin-goals").value;
+
+    if (goals === "") continue;
+
+    const { error } = await sb.rpc("update_player_goals", {
+      player_uuid: row.dataset.playerId,
+      goals_count: Number(goals)
+    });
+
+    if (error) {
+      console.error("update_player_goals error:", error);
+      toast(error.message);
+      return;
+    }
+  }
+
+  const { error: recalcError } = await sb.rpc("recalculate_pool_scores", {
+    pool_uuid: pool.id
+  });
+
+  if (recalcError) {
+    console.error("recalculate_pool_scores error:", recalcError);
+    toast(recalcError.message);
+    return;
+  }
+
+  toast("Resultados guardados y ranking recalculado.");
+  await openRanking(pool.id);
 }
 
 async function openBet(poolId) {
@@ -1231,6 +1455,16 @@ function bindEvents() {
   });
 
   $("backPoolFromMyBetBtn")?.addEventListener("click", () => {
+    if (currentPool) openPool(currentPool.id);
+    else loadDashboard();
+  });
+
+  $("backPoolFromRankingBtn")?.addEventListener("click", () => {
+    if (currentPool) openPool(currentPool.id);
+    else loadDashboard();
+  });
+
+  $("backPoolFromAdminBtn")?.addEventListener("click", () => {
     if (currentPool) openPool(currentPool.id);
     else loadDashboard();
   });
