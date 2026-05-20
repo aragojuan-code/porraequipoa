@@ -39,15 +39,38 @@ async function loadProfile() {
     .from("profiles")
     .select("*")
     .eq("id", currentUser.id)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    console.warn(error);
+  console.log("Profile response:", { data, error });
+
+  if (!error && data) {
+    currentProfile = data;
+    return;
+  }
+
+  const proposedName = prompt(
+    "Elige tu nombre visible. Será el nombre que aparecerá en todas tus porras privadas y no puede estar repetido."
+  );
+
+  if (!proposedName) {
     currentProfile = null;
     return;
   }
 
-  currentProfile = data;
+  const { data: createdProfile, error: createError } = await sb.rpc("ensure_my_profile", {
+    name_input: proposedName
+  });
+
+  console.log("Created profile response:", { createdProfile, createError });
+
+  if (createError) {
+    alert("Error creando perfil: " + createError.message);
+    toast(createError.message);
+    currentProfile = null;
+    return;
+  }
+
+  currentProfile = createdProfile;
 }
 
 async function loadDashboard() {
@@ -221,15 +244,16 @@ async function loginUser(e) {
 
     currentUser = data.user;
 
-    await loadProfile();
 
-    if (!currentProfile) {
-      alert("Login correcto, pero no se pudo cargar el perfil.");
-      return;
-    }
+await loadProfile();
 
-    toast("Login correcto.");
-    await loadDashboard();
+if (!currentProfile) {
+  alert("Login correcto, pero no se pudo cargar el perfil.");
+  return;
+}
+
+toast("Login correcto.");
+await loadDashboard();
 
   } catch (err) {
     console.error("Login fatal error:", err);
