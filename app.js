@@ -628,21 +628,37 @@ async function saveAdminResults(pool) {
   const matchRows = Array.from(document.querySelectorAll("tr[data-match-id]"));
   const playerRows = Array.from(document.querySelectorAll("tr[data-player-id]"));
 
+  async function runRpcFallback(calls) {
+    let lastError = null;
+    for (const call of calls) {
+      const { error } = await sb.rpc(call.fn, call.args);
+      if (!error) return null;
+      lastError = error;
+      if (error.code !== "PGRST202") return error;
+    }
+    return lastError;
+  }
+
   for (const row of matchRows) {
     const home = row.querySelector(".admin-home").value;
     const away = row.querySelector(".admin-away").value;
 
     if (home === "" || away === "") continue;
 
-    const { error } = await sb.rpc("update_match_result", {
-      match_uuid: row.dataset.matchId,
-      home_score: Number(home),
-      away_score: Number(away)
-    });
+    const matchId = row.dataset.matchId;
+    const error = await runRpcFallback([
+      { fn: "update_match_result", args: { match_uuid: matchId, home_score: Number(home), away_score: Number(away) } },
+      { fn: "update_match_result", args: { p_match_uuid: matchId, p_home_score: Number(home), p_away_score: Number(away) } },
+      { fn: "update_match_result", args: { match_id: matchId, home_goals: Number(home), away_goals: Number(away) } }
+    ]);
 
     if (error) {
       console.error("update_match_result error:", error);
-      toast(error.message);
+      if (error.code === "PGRST202") {
+        toast("Falta crear/actualizar la función SQL update_match_result en Supabase (schema cache). Ejecuta supabase_phase3.sql y recarga.");
+      } else {
+        toast(error.message);
+      }
       return;
     }
   }
