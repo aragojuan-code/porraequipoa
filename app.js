@@ -20,6 +20,7 @@ let currentProfile = null;
 let currentPool = null;
 let currentPoolMembers = [];
 let competitionsCache = [];
+let booting = false;
 
 function show(viewId) {
   [
@@ -40,6 +41,7 @@ function show(viewId) {
 
 function toast(msg, ms = 3600) {
   const el = $("toast");
+
   if (!el) {
     alert(msg);
     return;
@@ -57,13 +59,9 @@ function cleanCode(v) {
   return String(v || "").trim().toUpperCase();
 }
 
-function nowMs() {
-  return Date.now();
-}
-
 function isPoolClosed(pool) {
   if (!pool || !pool.predictions_close_at) return false;
-  return new Date(pool.predictions_close_at).getTime() <= nowMs();
+  return new Date(pool.predictions_close_at).getTime() <= Date.now();
 }
 
 function formatDate(value) {
@@ -146,82 +144,108 @@ function realScoreText(match) {
   return `${match.home_goals} - ${match.away_goals}`;
 }
 
-async function loadSession() {
-  const { data, error } = await sb.auth.getSession();
+async function bootApp() {
+  if (booting) return;
+  booting = true;
 
-  console.log("Session response:", { data, error });
+  try {
+    console.log("=== BOOT APP ===");
 
-  if (error) {
-    console.error("Session error:", error);
+    const { data, error } = await sb.auth.getSession();
+
+    console.log("Session response:", { data, error });
+
+    if (error) {
+      console.error("Session error:", error);
+      show("landingView");
+      return;
+    }
+
+    const session = data.session;
+
+    if (!session || !session.user) {
+      currentUser = null;
+      currentProfile = null;
+      show("landingView");
+      return;
+    }
+
+    currentUser = session.user;
+
+    const profile = await fetchProfile(currentUser.id);
+
+    if (!profile) {
+      alert("Hay sesión iniciada, pero no se encontró el perfil en public.profiles.");
+      showLogin();
+      return;
+    }
+
+    currentProfile = profile;
+
+    await loadDashboard();
+  } catch (err) {
+    console.error("Boot fatal error:", err);
+    alert("Error cargando la app: " + err.message);
     show("landingView");
-    return;
+  } finally {
+    booting = false;
   }
-
-  currentUser = data.session?.user || null;
-
-  if (!currentUser) {
-    show("landingView");
-    return;
-  }
-
-  await loadProfile();
-
-  if (!currentProfile) {
-    alert("Hay sesión iniciada, pero no se pudo cargar el perfil.");
-    show("authView");
-    $("loginForm")?.classList.remove("hidden");
-    $("registerForm")?.classList.add("hidden");
-    return;
-  }
-
-  await loadDashboard();
 }
 
-async function loadProfile() {
-  if (!currentUser) {
-    currentProfile = null;
-    return;
-  }
-
+async function fetchProfile(userId) {
   const { data, error } = await sb
     .from("profiles")
     .select("*")
-    .eq("id", currentUser.id)
+    .eq("id", userId)
     .maybeSingle();
 
   console.log("Profile response:", { data, error });
 
-  if (!error && data) {
-    currentProfile = data;
-    return;
+  if (error) {
+    console.error("Profile error:", error);
+    return null;
   }
+
+  return data || null;
+}
+
+async function ensureProfileForCurrentUser() {
+  if (!currentUser) return null;
+
+  let profile = await fetchProfile(currentUser.id);
+
+  if (profile) return profile;
 
   const proposedName = prompt(
     "Elige tu nombre visible. Será el nombre que aparecerá en todas tus porras privadas y no puede estar repetido."
   );
 
-  if (!proposedName) {
-    currentProfile = null;
-    return;
+  if (!proposedName) return null;
+
+  const { data, error } = await sb.rpc("ensure_my_profile", {
+    name_input: proposedName
+  });
+
+  console.log("Created profile response:", { data, error });
+
+  if (error) {
+    alert("Error creando perfil: " + error.message);
+    return null;
   }
 
-  const { data: createdProfile, error: createError } = await sb.rpc(
-    "ensure_my_profile",
-    {
-      name_input: proposedName
-    }
-  );
+  return data;
+}
 
-  console.log("Created profile response:", { createdProfile, createError });
+function showLogin() {
+  show("authView");
+  $("loginForm")?.classList.remove("hidden");
+  $("registerForm")?.classList.add("hidden");
+}
 
-  if (createError) {
-    alert("Error creando perfil: " + createError.message);
-    toast(createError.message);
-    currentProfile = null;
-    return;
-  }
-
-  currentProfile = createdProfile;
+function showRegister() {
+  show("authView");
+  $("registerForm")?.classList.remove("hidden");
+  $("loginForm")?.classList.add("hidden");
 }
 
 async function loadCompetitions() {
@@ -995,12 +1019,13 @@ async function registerUser(event) {
   }
 
   toast("Cuenta creada. Si Supabase pide confirmación por email, confirma antes de entrar.");
-  await loadSession();
+  await bootApp();
 }
 
 async function loginUser(event) {
   event.preventDefault();
 
+  console.log("=== LOGIN START ===");
   toast("Intentando iniciar sesión...");
 
   const email = $("loginEmail").value.trim();
@@ -1012,7 +1037,7 @@ async function loginUser(event) {
       password
     });
 
-    console.log("Login response:", { data, error });
+    console.log("=== LOGIN RESPONSE ===", { data, error });
 
     if (error) {
       alert("Error login: " + error.message);
@@ -1027,31 +1052,27 @@ async function loginUser(event) {
 
     currentUser = data.user;
 
-    const { data: profile, error: profileError } = await sb
-      .from("profiles")
-      .select("*")
-      .eq("id", currentUser.id)
-      .maybeSingle();
+    console.log("=== USER SET ===", currentUser.email, currentUser.id);
 
-    console.log("Profile after login:", { profile, profileError });
+    const profile = await fetchProfile(currentUser.id);
 
-    if (profileError) {
-      alert("Error cargando perfil: " + profileError.message);
-      return;
-    }
+    console.log("=== PROFILE QUERY ===", profile);
 
     if (!profile) {
-      alert("Login correcto, pero este usuario no tiene perfil en public.profiles.");
+      alert("Login correcto, pero no existe perfil en public.profiles para este usuario.");
       return;
     }
 
     currentProfile = profile;
 
+    console.log("=== LOADING DASHBOARD ===");
+
     toast("Login correcto.");
     await loadDashboard();
 
+    console.log("=== DASHBOARD LOADED ===");
   } catch (err) {
-    console.error("Login fatal error:", err);
+    console.error("=== LOGIN FATAL ERROR ===", err);
     alert("Error inesperado: " + err.message);
   }
 }
@@ -1129,7 +1150,6 @@ async function joinPool(event) {
   await openPool(data);
 }
 
-// Música original NO. Esto genera un loop propio simple con Web Audio.
 let audioCtx = null;
 let loopTimer = null;
 
@@ -1178,16 +1198,10 @@ function startMissionSound() {
 }
 
 function stopMissionSound() {
-  if (loopTimer) {
-    clearInterval(loopTimer);
-  }
-
+  if (loopTimer) clearInterval(loopTimer);
   loopTimer = null;
 
-  if (audioCtx) {
-    audioCtx.close();
-  }
-
+  if (audioCtx) audioCtx.close();
   audioCtx = null;
 
   const soundBtn = $("soundBtn");
@@ -1198,27 +1212,10 @@ function stopMissionSound() {
 }
 
 function bindEvents() {
-  $("showRegisterBtn")?.addEventListener("click", () => {
-    show("authView");
-    $("registerForm")?.classList.remove("hidden");
-    $("loginForm")?.classList.add("hidden");
-  });
-
-  $("showLoginBtn")?.addEventListener("click", () => {
-    show("authView");
-    $("loginForm")?.classList.remove("hidden");
-    $("registerForm")?.classList.add("hidden");
-  });
-
-  $("goLoginBtn")?.addEventListener("click", () => {
-    $("registerForm")?.classList.add("hidden");
-    $("loginForm")?.classList.remove("hidden");
-  });
-
-  $("goRegisterBtn")?.addEventListener("click", () => {
-    $("loginForm")?.classList.add("hidden");
-    $("registerForm")?.classList.remove("hidden");
-  });
+  $("showRegisterBtn")?.addEventListener("click", showRegister);
+  $("showLoginBtn")?.addEventListener("click", showLogin);
+  $("goLoginBtn")?.addEventListener("click", showLogin);
+  $("goRegisterBtn")?.addEventListener("click", showRegister);
 
   $("registerForm")?.addEventListener("submit", registerUser);
   $("loginForm")?.addEventListener("submit", loginUser);
@@ -1229,19 +1226,13 @@ function bindEvents() {
   $("backDashboardBtn")?.addEventListener("click", loadDashboard);
 
   $("backPoolBtn")?.addEventListener("click", () => {
-    if (currentPool) {
-      openPool(currentPool.id);
-    } else {
-      loadDashboard();
-    }
+    if (currentPool) openPool(currentPool.id);
+    else loadDashboard();
   });
 
   $("backPoolFromMyBetBtn")?.addEventListener("click", () => {
-    if (currentPool) {
-      openPool(currentPool.id);
-    } else {
-      loadDashboard();
-    }
+    if (currentPool) openPool(currentPool.id);
+    else loadDashboard();
   });
 
   $("soundBtn")?.addEventListener("click", startMissionSound);
@@ -1249,8 +1240,6 @@ function bindEvents() {
 
 sb.auth.onAuthStateChange((event, session) => {
   console.log("Auth state changed:", event, session);
-
-  currentUser = session?.user || null;
 
   if (event === "SIGNED_OUT") {
     currentUser = null;
@@ -1261,4 +1250,4 @@ sb.auth.onAuthStateChange((event, session) => {
 });
 
 bindEvents();
-loadSession();
+bootApp();
