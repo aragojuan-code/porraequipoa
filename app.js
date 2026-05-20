@@ -51,9 +51,9 @@ async function loadProfile() {
 }
 
 async function loadDashboard() {
-  $("userLine").textContent = currentProfile
-    ? `Conectado como ${currentProfile.display_name} (@${currentProfile.username})`
-    : `Conectado como ${currentUser.email}`;
+ $("userLine").textContent = currentProfile
+  ? `Conectado como ${currentProfile.display_name}`
+  : `Conectado como ${currentUser.email}`;
 
   show("dashboardView");
   await renderPools();
@@ -121,12 +121,12 @@ async function openPool(poolId) {
     return;
   }
 
-  const memberRows = (members || []).map(m => `
-    <li>
-      <strong>${escapeHtml(m.profiles?.display_name || "Usuario")}</strong>
-      <span class="muted">@${escapeHtml(m.profiles?.username || "sin_username")} · ${escapeHtml(m.role)}</span>
-    </li>
-  `).join("");
+ const memberRows = (members || []).map(m => `
+  <li>
+    <strong>${escapeHtml(m.profiles?.display_name || "Usuario")}</strong>
+    <span class="muted">· ${escapeHtml(m.role)}</span>
+  </li>
+`).join("");
 
   $("poolDetail").innerHTML = `
     <div class="card">
@@ -153,13 +153,20 @@ async function registerUser(e) {
 
   const email = $("regEmail").value.trim();
   const password = $("regPassword").value;
-  const username = $("regUsername").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
   const displayName = $("regDisplayName").value.trim();
 
-  if (!username || username.length < 3) {
-    toast("El nombre de usuario debe tener al menos 3 caracteres.");
-    return;
-  }
+if (!displayName || displayName.length < 2) {
+  toast("El nombre visible debe tener al menos 2 caracteres.");
+  return;
+}
+
+const displayNameKey = displayName.toLowerCase().replace(/\s+/g, " ").trim();
+const username = displayNameKey
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, "_")
+  .replace(/^_+|_+$/g, "")
+  .slice(0, 32);
 
   const { data, error } = await sb.auth.signUp({
     email,
@@ -178,15 +185,26 @@ async function registerUser(e) {
   }
 
   const { error: profileError } = await sb.from("profiles").insert({
-    id: user.id,
-    username,
-    display_name: displayName
-  });
+  id: user.id,
+  username,
+  display_name: displayName,
+  display_name_key: displayNameKey
+});
 
-  if (profileError) {
-    toast(`Cuenta creada, pero falló el perfil: ${profileError.message}`);
+if (profileError) {
+  if (
+    profileError.code === "23505" ||
+    String(profileError.message || "").toLowerCase().includes("duplicate")
+  ) {
+    toast("Ese nombre visible ya está registrado. Elige otro.");
     return;
   }
+
+  toast(`Cuenta creada, pero falló el perfil: ${profileError.message}`);
+  return;
+}
+
+  
 
   toast("Cuenta creada. Si Supabase pide confirmación por email, confirma antes de entrar.");
   await loadSession();
