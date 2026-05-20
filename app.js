@@ -1,5 +1,17 @@
 const cfg = window.PORRA_EQUIPO_A_CONFIG || {};
-const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+const sb = window.supabase.createClient(
+  cfg.SUPABASE_URL,
+  cfg.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage
+    }
+  }
+);
 
 const $ = (id) => document.getElementById(id);
 
@@ -1013,11 +1025,19 @@ async function loginUser(event) {
       return;
     }
 
-    toast("Login correcto. Cargando panel...");
+    currentUser = data.user;
 
-    setTimeout(() => {
-      window.location.reload();
-    }, 600);
+    await loadProfile();
+
+    console.log("Profile after login:", currentProfile);
+
+    if (!currentProfile) {
+      alert("Login correcto, pero no se pudo cargar el perfil.");
+      return;
+    }
+
+    toast("Login correcto.");
+    await loadDashboard();
 
   } catch (err) {
     console.error("Login fatal error:", err);
@@ -1216,8 +1236,25 @@ function bindEvents() {
   $("soundBtn")?.addEventListener("click", startMissionSound);
 }
 
-sb.auth.onAuthStateChange((_event, session) => {
+sb.auth.onAuthStateChange(async (event, session) => {
+  console.log("Auth state changed:", event, session);
+
   currentUser = session?.user || null;
+
+  if (event === "SIGNED_IN" && currentUser) {
+    await loadProfile();
+
+    if (currentProfile) {
+      await loadDashboard();
+    }
+  }
+
+  if (event === "SIGNED_OUT") {
+    currentUser = null;
+    currentProfile = null;
+    currentPool = null;
+    show("landingView");
+  }
 });
 
 bindEvents();
