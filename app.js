@@ -1241,6 +1241,19 @@ function bindEvents() {
 sb.auth.onAuthStateChange((event, session) => {
   console.log("Auth state changed:", event, session);
 
+  if (event === "SIGNED_IN" && session?.user) {
+    currentUser = session.user;
+    ensureProfileForCurrentUser()
+      .then((profile) => {
+        if (!profile) return;
+        currentProfile = profile;
+        return loadDashboard();
+      })
+      .catch((error) => {
+        console.error("SIGNED_IN bootstrap error:", error);
+      });
+  }
+
   if (event === "SIGNED_OUT") {
     currentUser = null;
     currentProfile = null;
