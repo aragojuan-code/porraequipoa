@@ -200,9 +200,6 @@ async function loginUser(e) {
   const email = $("loginEmail").value.trim();
   const password = $("loginPassword").value;
 
-  console.log("Login attempt:", email);
-  console.log("Supabase config:", window.PORRA_EQUIPO_A_CONFIG);
-
   try {
     const { data, error } = await sb.auth.signInWithPassword({
       email,
@@ -217,8 +214,23 @@ async function loginUser(e) {
       return;
     }
 
+    if (!data.session || !data.user) {
+      alert("Login recibido, pero Supabase no devolvió sesión.");
+      return;
+    }
+
+    currentUser = data.user;
+
+    await loadProfile();
+
+    if (!currentProfile) {
+      alert("Login correcto, pero no se pudo cargar el perfil.");
+      return;
+    }
+
     toast("Login correcto.");
-    await loadSession();
+    await loadDashboard();
+
   } catch (err) {
     console.error("Login fatal error:", err);
     alert("Error inesperado: " + err.message);
