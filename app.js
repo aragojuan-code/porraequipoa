@@ -1005,21 +1005,16 @@ async function loginUser(event) {
     }
 
     if (!data.session || !data.user) {
-      alert("Login recibido, pero Supabase no devolvió sesión.");
+      alert("Login correcto, pero Supabase no devolvió sesión.");
       return;
     }
 
-    currentUser = data.user;
+    toast("Login correcto. Cargando panel...");
 
-    await loadProfile();
+    setTimeout(() => {
+      window.location.reload();
+    }, 600);
 
-    if (!currentProfile) {
-      alert("Login correcto, pero no se pudo cargar el perfil.");
-      return;
-    }
-
-    toast("Login correcto.");
-    await loadDashboard();
   } catch (err) {
     console.error("Login fatal error:", err);
     alert("Error inesperado: " + err.message);
