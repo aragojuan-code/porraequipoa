@@ -5,29 +5,156 @@ const $ = (id) => document.getElementById(id);
 
 let currentUser = null;
 let currentProfile = null;
+let currentPool = null;
+let currentPoolMembers = [];
+let competitionsCache = [];
 
 function show(viewId) {
-  ["landingView", "authView", "dashboardView", "poolView"].forEach(id => $(id).classList.add("hidden"));
-  $(viewId).classList.remove("hidden");
+  [
+    "landingView",
+    "authView",
+    "dashboardView",
+    "poolView",
+    "betView",
+    "myBetView"
+  ].forEach((id) => {
+    const el = $(id);
+    if (el) el.classList.add("hidden");
+  });
+
+  const target = $(viewId);
+  if (target) target.classList.remove("hidden");
 }
 
-function toast(msg, ms = 3200) {
+function toast(msg, ms = 3600) {
   const el = $("toast");
+  if (!el) {
+    alert(msg);
+    return;
+  }
+
   el.textContent = msg;
   el.classList.remove("hidden");
-  setTimeout(() => el.classList.add("hidden"), ms);
+
+  setTimeout(() => {
+    el.classList.add("hidden");
+  }, ms);
 }
 
 function cleanCode(v) {
   return String(v || "").trim().toUpperCase();
 }
 
+function nowMs() {
+  return Date.now();
+}
+
+function isPoolClosed(pool) {
+  if (!pool || !pool.predictions_close_at) return false;
+  return new Date(pool.predictions_close_at).getTime() <= nowMs();
+}
+
+function formatDate(value) {
+  if (!value) return "Sin fecha";
+
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function getSign(home, away) {
+  if (home > away) return "H";
+  if (home < away) return "A";
+  return "D";
+}
+
+function scorePrediction(pred, match) {
+  if (
+    match.home_goals === null ||
+    match.home_goals === undefined ||
+    match.away_goals === null ||
+    match.away_goals === undefined
+  ) {
+    return {
+      points: null,
+      label: "Pendiente",
+      cls: "result-pending"
+    };
+  }
+
+  if (
+    Number(pred.home_goals) === Number(match.home_goals) &&
+    Number(pred.away_goals) === Number(match.away_goals)
+  ) {
+    return {
+      points: 3,
+      label: "Exacto",
+      cls: "result-exact"
+    };
+  }
+
+  const predSign = getSign(Number(pred.home_goals), Number(pred.away_goals));
+  const realSign = getSign(Number(match.home_goals), Number(match.away_goals));
+
+  if (predSign === realSign) {
+    return {
+      points: 1,
+      label: "Signo",
+      cls: "result-sign"
+    };
+  }
+
+  return {
+    points: 0,
+    label: "Fallado",
+    cls: "result-bad"
+  };
+}
+
+function realScoreText(match) {
+  if (
+    match.home_goals === null ||
+    match.home_goals === undefined ||
+    match.away_goals === null ||
+    match.away_goals === undefined
+  ) {
+    return "Pendiente";
+  }
+
+  return `${match.home_goals} - ${match.away_goals}`;
+}
+
 async function loadSession() {
-  const { data } = await sb.auth.getSession();
+  const { data, error } = await sb.auth.getSession();
+
+  if (error) {
+    console.error("Session error:", error);
+    show("landingView");
+    return;
+  }
+
   currentUser = data.session?.user || null;
 
   if (currentUser) {
     await loadProfile();
+
+    if (!currentProfile) {
+      show("authView");
+      $("loginForm")?.classList.remove("hidden");
+      $("registerForm")?.classList.add("hidden");
+      return;
+    }
+
     await loadDashboard();
   } else {
     show("landingView");
@@ -35,6 +162,11 @@ async function loadSession() {
 }
 
 async function loadProfile() {
+  if (!currentUser) {
+    currentProfile = null;
+    return;
+  }
+
   const { data, error } = await sb
     .from("profiles")
     .select("*")
@@ -57,9 +189,12 @@ async function loadProfile() {
     return;
   }
 
-  const { data: createdProfile, error: createError } = await sb.rpc("ensure_my_profile", {
-    name_input: proposedName
-  });
+  const { data: createdProfile, error: createError } = await sb.rpc(
+    "ensure_my_profile",
+    {
+      name_input: proposedName
+    }
+  );
 
   console.log("Created profile response:", { createdProfile, createError });
 
@@ -73,17 +208,58 @@ async function loadProfile() {
   currentProfile = createdProfile;
 }
 
+async function loadCompetitions() {
+  const select = $("competitionSelect");
+  if (!select) return;
+
+  const { data, error } = await sb
+    .from("competitions")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Competitions error:", error);
+    toast("No se pudieron cargar competiciones: " + error.message);
+    return;
+  }
+
+  competitionsCache = data || [];
+  select.innerHTML = "";
+
+  if (competitionsCache.length === 0) {
+    select.innerHTML = `<option value="">No hay competiciones</option>`;
+    return;
+  }
+
+  competitionsCache.forEach((competition) => {
+    const option = document.createElement("option");
+    option.value = competition.id;
+    option.textContent = `${competition.name}${
+      competition.season ? " · " + competition.season : ""
+    }`;
+    select.appendChild(option);
+  });
+}
+
 async function loadDashboard() {
-  $("userLine").textContent = currentProfile
-    ? `Conectado como ${currentProfile.display_name} (@${currentProfile.username})`
-    : `Conectado como ${currentUser.email}`;
+  const userLine = $("userLine");
+
+  if (userLine) {
+    userLine.textContent = currentProfile
+      ? `Conectado como ${currentProfile.display_name}`
+      : `Conectado como ${currentUser.email}`;
+  }
 
   show("dashboardView");
+
+  await loadCompetitions();
   await renderPools();
 }
 
 async function renderPools() {
   const list = $("poolsList");
+  if (!list) return;
+
   list.innerHTML = `<p class="muted">Cargando porras...</p>`;
 
   const { data, error } = await sb
@@ -92,7 +268,10 @@ async function renderPools() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    list.innerHTML = `<p class="muted">No se pudieron cargar las porras: ${error.message}</p>`;
+    console.error("my_pools error:", error);
+    list.innerHTML = `<p class="muted">No se pudieron cargar las porras: ${escapeHtml(
+      error.message
+    )}</p>`;
     return;
   }
 
@@ -102,9 +281,11 @@ async function renderPools() {
   }
 
   list.innerHTML = "";
-  data.forEach(pool => {
+
+  data.forEach((pool) => {
     const item = document.createElement("div");
     item.className = "pool-item";
+
     item.innerHTML = `
       <div>
         <div class="pool-name">${escapeHtml(pool.name)}</div>
@@ -112,54 +293,108 @@ async function renderPools() {
           Código <span class="code">${escapeHtml(pool.invite_code)}</span>
           · ${pool.member_count} miembro(s)
           · rol: ${escapeHtml(pool.role)}
+          ${pool.competition_name ? `· ${escapeHtml(pool.competition_name)}` : ""}
         </div>
       </div>
       <button class="secondary-btn" type="button">Abrir</button>
     `;
-    item.querySelector("button").addEventListener("click", () => openPool(pool.id));
+
+    item.querySelector("button").addEventListener("click", () => {
+      openPool(pool.id);
+    });
+
     list.appendChild(item);
   });
+}
+
+async function fetchPool(poolId) {
+  const { data, error } = await sb
+    .from("pools")
+    .select("*, competitions:competition_id(name, season)")
+    .eq("id", poolId)
+    .single();
+
+  if (error) throw error;
+
+  return data;
 }
 
 async function openPool(poolId) {
   const { data: pool, error: poolError } = await sb
     .from("pools")
-    .select("*")
+    .select("*, competitions:competition_id(name, season)")
     .eq("id", poolId)
     .single();
 
   if (poolError) {
+    console.error("Pool error:", poolError);
     toast(poolError.message);
     return;
   }
 
+  currentPool = pool;
+
   const { data: members, error: membersError } = await sb
     .from("pool_members")
-    .select("role, joined_at, profiles:user_id(username, display_name)")
+    .select("role, joined_at, profiles:user_id(display_name)")
     .eq("pool_id", poolId)
     .order("joined_at", { ascending: true });
 
   if (membersError) {
+    console.error("Members error:", membersError);
     toast(membersError.message);
     return;
   }
 
-  const memberRows = (members || []).map(m => `
-    <li>
-      <strong>${escapeHtml(m.profiles?.display_name || "Usuario")}</strong>
-      <span class="muted">@${escapeHtml(m.profiles?.username || "sin_username")} · ${escapeHtml(m.role)}</span>
-    </li>
-  `).join("");
+  currentPoolMembers = members || [];
 
-  $("poolDetail").innerHTML = `
+  const memberRows = currentPoolMembers
+    .map((member) => {
+      return `
+        <li>
+          <strong>${escapeHtml(member.profiles?.display_name || "Usuario")}</strong>
+          <span class="muted">· ${escapeHtml(member.role)}</span>
+        </li>
+      `;
+    })
+    .join("");
+
+  const closed = isPoolClosed(pool);
+
+  const statusHtml = closed
+    ? `<span class="status-pill status-closed">🔒 Apuestas cerradas</span>`
+    : `<span class="status-pill status-open">✅ Apuestas abiertas</span>`;
+
+  const poolDetail = $("poolDetail");
+
+  poolDetail.innerHTML = `
     <div class="card">
       <div class="card-kicker">PORRA PRIVADA</div>
       <h1>${escapeHtml(pool.name)}</h1>
+
+      <p>
+        Competición:
+        <strong>${escapeHtml(pool.competitions?.name || "Sin competición")}</strong>
+      </p>
+
       <p>Código para invitar amigos:</p>
       <span class="code big-code">${escapeHtml(pool.invite_code)}</span>
+
+      <p>${statusHtml}</p>
+
       <p class="muted">
-        Próxima fase: añadir competición, equipos, jugadores, pichichi y predicciones.
+        Cierre de apuestas: ${escapeHtml(formatDate(pool.predictions_close_at))}
       </p>
+
+      <div class="action-row">
+        <button id="goBetBtn" class="primary-btn" type="button">
+          ${closed ? "Ver formulario bloqueado" : "Hacer / modificar apuesta"}
+        </button>
+
+        <button id="goMyBetBtn" class="secondary-btn" type="button">
+          Mi apuesta
+        </button>
+      </div>
     </div>
 
     <div class="card" style="margin-top:18px">
@@ -168,21 +403,543 @@ async function openPool(poolId) {
     </div>
   `;
 
+  $("goBetBtn").addEventListener("click", () => {
+    openBet(pool.id);
+  });
+
+  $("goMyBetBtn").addEventListener("click", () => {
+    openMyBet(pool.id);
+  });
+
   show("poolView");
 }
 
-async function registerUser(e) {
-  e.preventDefault();
+async function openBet(poolId) {
+  const pool = currentPool?.id === poolId ? currentPool : await fetchPool(poolId);
+  currentPool = pool;
+
+  if (!pool.competition_id) {
+    toast(
+      "Esta porra no tiene competición asignada. Crea una porra nueva o asigna Eurocopa Demo en Supabase."
+    );
+    return;
+  }
+
+  const closed = isPoolClosed(pool);
+
+  const [
+    { data: matches, error: matchesError },
+    { data: players, error: playersError },
+    { data: existingPredictions, error: predictionsError },
+    { data: existingPick, error: pickError }
+  ] = await Promise.all([
+    sb
+      .from("matches")
+      .select("*, home:home_team_id(name), away:away_team_id(name)")
+      .eq("competition_id", pool.competition_id)
+      .order("kickoff", { ascending: true }),
+
+    sb
+      .from("players")
+      .select("*, team:team_id(name)")
+      .eq("competition_id", pool.competition_id)
+      .order("name", { ascending: true }),
+
+    sb
+      .from("predictions")
+      .select("*")
+      .eq("pool_id", pool.id)
+      .eq("user_id", currentUser.id),
+
+    sb
+      .from("top_scorer_picks")
+      .select("*")
+      .eq("pool_id", pool.id)
+      .eq("user_id", currentUser.id)
+      .maybeSingle()
+  ]);
+
+  if (matchesError) {
+    console.error("Matches error:", matchesError);
+    toast(matchesError.message);
+    return;
+  }
+
+  if (playersError) {
+    console.error("Players error:", playersError);
+    toast(playersError.message);
+    return;
+  }
+
+  if (predictionsError) {
+    console.error("Predictions error:", predictionsError);
+    toast(predictionsError.message);
+    return;
+  }
+
+  if (pickError) {
+    console.error("Pick error:", pickError);
+  }
+
+  const predByMatch = new Map(
+    (existingPredictions || []).map((prediction) => [
+      prediction.match_id,
+      prediction
+    ])
+  );
+
+  const playerOptions = (players || [])
+    .map((player) => {
+      return `
+        <option value="${player.id}" ${
+        existingPick?.player_id === player.id ? "selected" : ""
+      }>
+          ${escapeHtml(player.name)} (${escapeHtml(player.team?.name || "Equipo")})
+        </option>
+      `;
+    })
+    .join("");
+
+  const matchRows = (matches || [])
+    .map((match) => {
+      const pred = predByMatch.get(match.id);
+
+      return `
+        <div class="match-row" data-match-id="${match.id}">
+          <div class="team-home">${escapeHtml(match.home?.name || "Local")}</div>
+
+          <input
+            class="score-input home-score"
+            type="number"
+            min="0"
+            max="30"
+            inputmode="numeric"
+            value="${pred?.home_goals ?? ""}"
+            ${closed ? "disabled" : ""}
+          />
+
+          <div class="vs">-</div>
+
+          <input
+            class="score-input away-score"
+            type="number"
+            min="0"
+            max="30"
+            inputmode="numeric"
+            value="${pred?.away_goals ?? ""}"
+            ${closed ? "disabled" : ""}
+          />
+
+          <div class="team-away">${escapeHtml(match.away?.name || "Visitante")}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const betContent = $("betContent");
+
+  betContent.innerHTML = `
+    <div class="card">
+      <div class="card-kicker">BOLETO DE MISIÓN</div>
+      <h1>Hacer apuesta</h1>
+
+      <p>
+        ${
+          closed
+            ? "Las apuestas están cerradas. Puedes consultar tu boleto, pero no modificarlo."
+            : "Rellena todos los partidos y elige tu pichichi. Puedes modificarlo hasta el cierre."
+        }
+      </p>
+
+      <p class="muted">Cierre: ${escapeHtml(formatDate(pool.predictions_close_at))}</p>
+
+      <label>Tu pichichi</label>
+      <select id="topScorerSelect" ${closed ? "disabled" : ""}>
+        <option value="">Selecciona jugador...</option>
+        ${playerOptions}
+      </select>
+    </div>
+
+    <form id="betForm" class="card" style="margin-top:18px">
+      <div class="card-kicker">PARTIDOS</div>
+      <div class="match-list">${matchRows}</div>
+
+      ${
+        closed
+          ? ""
+          : `<button class="primary-btn full" type="submit">Guardar apuesta</button>`
+      }
+    </form>
+  `;
+
+  if (!closed) {
+    $("betForm").addEventListener("submit", (event) => {
+      saveBet(event, pool, matches || []);
+    });
+  }
+
+  show("betView");
+}
+
+async function saveBet(event, pool, matches) {
+  event.preventDefault();
+
+  if (isPoolClosed(pool)) {
+    toast("Las apuestas ya están cerradas.");
+    return;
+  }
+
+  const topScorerId = $("topScorerSelect").value;
+
+  if (!topScorerId) {
+    toast("Te falta elegir pichichi.");
+    return;
+  }
+
+  const rows = Array.from(document.querySelectorAll(".match-row"));
+  const predictions = [];
+
+  for (const row of rows) {
+    const matchId = row.dataset.matchId;
+    const homeRaw = row.querySelector(".home-score").value;
+    const awayRaw = row.querySelector(".away-score").value;
+
+    if (homeRaw === "" || awayRaw === "") {
+      toast("Te faltan partidos por completar.");
+      return;
+    }
+
+    predictions.push({
+      pool_id: pool.id,
+      user_id: currentUser.id,
+      match_id: matchId,
+      home_goals: Number(homeRaw),
+      away_goals: Number(awayRaw),
+      updated_at: new Date().toISOString()
+    });
+  }
+
+  if (predictions.length !== matches.length) {
+    toast("El boleto no está completo.");
+    return;
+  }
+
+  const { error: predError } = await sb
+    .from("predictions")
+    .upsert(predictions, {
+      onConflict: "pool_id,user_id,match_id"
+    });
+
+  if (predError) {
+    console.error("Save predictions error:", predError);
+    toast(predError.message);
+    return;
+  }
+
+  const { error: pickError } = await sb
+    .from("top_scorer_picks")
+    .upsert(
+      {
+        pool_id: pool.id,
+        user_id: currentUser.id,
+        player_id: topScorerId,
+        updated_at: new Date().toISOString()
+      },
+      {
+        onConflict: "pool_id,user_id"
+      }
+    );
+
+  if (pickError) {
+    console.error("Save pick error:", pickError);
+    toast(pickError.message);
+    return;
+  }
+
+  const { error: entryError } = await sb
+    .from("pool_entries")
+    .upsert(
+      {
+        pool_id: pool.id,
+        user_id: currentUser.id,
+        status: "submitted",
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        onConflict: "pool_id,user_id"
+      }
+    );
+
+  if (entryError) {
+    console.error("Save entry error:", entryError);
+    toast(entryError.message);
+    return;
+  }
+
+  $("betContent").innerHTML = `
+    <div class="card">
+      <div class="card-kicker">APUESTA GUARDADA</div>
+      <h1>✅ Tu apuesta está lista</h1>
+
+      <p>
+        Tu boleto ha quedado guardado correctamente. Puedes consultarlo cuando quieras
+        y modificarlo hasta que cierre el plazo.
+      </p>
+
+      <p class="muted">
+        Cierre de apuestas: ${escapeHtml(formatDate(pool.predictions_close_at))}
+      </p>
+
+      <div class="action-row">
+        <button id="viewMyBetAfterSaveBtn" class="primary-btn" type="button">
+          Ver mi apuesta
+        </button>
+
+        <button id="editAfterSaveBtn" class="secondary-btn" type="button">
+          Modificar apuesta
+        </button>
+      </div>
+    </div>
+  `;
+
+  $("viewMyBetAfterSaveBtn").addEventListener("click", () => {
+    openMyBet(pool.id);
+  });
+
+  $("editAfterSaveBtn").addEventListener("click", () => {
+    openBet(pool.id);
+  });
+}
+
+async function openMyBet(poolId) {
+  const pool = currentPool?.id === poolId ? currentPool : await fetchPool(poolId);
+  currentPool = pool;
+
+  if (!pool.competition_id) {
+    toast("Esta porra no tiene competición asignada.");
+    return;
+  }
+
+  const [
+    { data: matches, error: matchesError },
+    { data: predictions, error: predictionsError },
+    { data: pick, error: pickError },
+    { data: topPlayers, error: topPlayersError }
+  ] = await Promise.all([
+    sb
+      .from("matches")
+      .select("*, home:home_team_id(name), away:away_team_id(name)")
+      .eq("competition_id", pool.competition_id)
+      .order("kickoff", { ascending: true }),
+
+    sb
+      .from("predictions")
+      .select("*")
+      .eq("pool_id", pool.id)
+      .eq("user_id", currentUser.id),
+
+    sb
+      .from("top_scorer_picks")
+      .select("*, player:player_id(name, goals, team:team_id(name))")
+      .eq("pool_id", pool.id)
+      .eq("user_id", currentUser.id)
+      .maybeSingle(),
+
+    sb
+      .from("players")
+      .select("*, team:team_id(name)")
+      .eq("competition_id", pool.competition_id)
+      .order("goals", { ascending: false })
+      .limit(5)
+  ]);
+
+  if (matchesError) {
+    console.error("My bet matches error:", matchesError);
+    toast(matchesError.message);
+    return;
+  }
+
+  if (predictionsError) {
+    console.error("My bet predictions error:", predictionsError);
+    toast(predictionsError.message);
+    return;
+  }
+
+  if (pickError) {
+    console.error("My bet pick error:", pickError);
+  }
+
+  if (topPlayersError) {
+    console.error("Top players error:", topPlayersError);
+  }
+
+  const predByMatch = new Map(
+    (predictions || []).map((prediction) => [
+      prediction.match_id,
+      prediction
+    ])
+  );
+
+  let totalKnownPoints = 0;
+
+  const rows = (matches || [])
+    .map((match) => {
+      const pred = predByMatch.get(match.id);
+
+      if (!pred) {
+        return `
+          <tr>
+            <td>${escapeHtml(match.home?.name)} - ${escapeHtml(match.away?.name)}</td>
+            <td>Sin apuesta</td>
+            <td>${realScoreText(match)}</td>
+            <td class="result-bad">-</td>
+          </tr>
+        `;
+      }
+
+      const score = scorePrediction(pred, match);
+
+      if (score.points !== null) {
+        totalKnownPoints += score.points;
+      }
+
+      return `
+        <tr>
+          <td>${escapeHtml(match.home?.name)} - ${escapeHtml(match.away?.name)}</td>
+          <td>${pred.home_goals} - ${pred.away_goals}</td>
+          <td>${realScoreText(match)}</td>
+          <td class="${score.cls}">
+            ${score.points === null ? "Pendiente" : "+" + score.points + " · " + score.label}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const topRows = (topPlayers || [])
+    .map((player, index) => {
+      const isMine = pick?.player_id === player.id;
+
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>
+            <strong>${escapeHtml(player.name)}</strong>
+            ${isMine ? " ← Tu elección" : ""}
+          </td>
+          <td>${escapeHtml(player.team?.name || "")}</td>
+          <td>${player.goals}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  $("myBetContent").innerHTML = `
+    <div class="card">
+      <div class="card-kicker">MI APUESTA</div>
+      <h1>Mi apuesta vs resultado real</h1>
+
+      <p class="muted">
+        Puntos de partidos ya resueltos: <strong>${totalKnownPoints}</strong>
+      </p>
+
+      <div class="action-row">
+        ${
+          isPoolClosed(pool)
+            ? ""
+            : `<button id="editFromMyBetBtn" class="secondary-btn" type="button">
+                Modificar antes del cierre
+              </button>`
+        }
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-kicker">PICHICHI</div>
+      <h2>Tu elección</h2>
+
+      <p>
+        ${
+          pick?.player
+            ? `<strong>${escapeHtml(pick.player.name)}</strong> (${escapeHtml(
+                pick.player.team?.name || "Equipo"
+              )}) — ${pick.player.goals} goles`
+            : "Todavía no has elegido pichichi."
+        }
+      </p>
+
+      <h2>Top 5 pichichis actuales</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jugador</th>
+              <th>Equipo</th>
+              <th>Goles</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topRows || `<tr><td colspan="4">Sin datos</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-kicker">PARTIDOS</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Partido</th>
+              <th>Tu apuesta</th>
+              <th>Resultado real</th>
+              <th>Puntos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const editBtn = $("editFromMyBetBtn");
+
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      openBet(pool.id);
+    });
+  }
+
+  show("myBetView");
+}
+
+async function registerUser(event) {
+  event.preventDefault();
 
   const email = $("regEmail").value.trim();
   const password = $("regPassword").value;
-  const username = $("regUsername").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
   const displayName = $("regDisplayName").value.trim();
 
-  if (!username || username.length < 3) {
-    toast("El nombre de usuario debe tener al menos 3 caracteres.");
+  if (!displayName || displayName.length < 2) {
+    toast("El nombre visible debe tener al menos 2 caracteres.");
     return;
   }
+
+  const displayNameKey = displayName.toLowerCase().replace(/\s+/g, " ").trim();
+
+  const username = displayNameKey
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
 
   const { data, error } = await sb.auth.signUp({
     email,
@@ -195,6 +952,7 @@ async function registerUser(e) {
   }
 
   const user = data.user;
+
   if (!user) {
     toast("Revisa tu email para confirmar la cuenta.");
     return;
@@ -203,10 +961,19 @@ async function registerUser(e) {
   const { error: profileError } = await sb.from("profiles").insert({
     id: user.id,
     username,
-    display_name: displayName
+    display_name: displayName,
+    display_name_key: displayNameKey
   });
 
   if (profileError) {
+    if (
+      profileError.code === "23505" ||
+      String(profileError.message || "").toLowerCase().includes("duplicate")
+    ) {
+      toast("Ese nombre visible ya está registrado. Elige otro.");
+      return;
+    }
+
     toast(`Cuenta creada, pero falló el perfil: ${profileError.message}`);
     return;
   }
@@ -215,8 +982,8 @@ async function registerUser(e) {
   await loadSession();
 }
 
-async function loginUser(e) {
-  e.preventDefault();
+async function loginUser(event) {
+  event.preventDefault();
 
   toast("Intentando iniciar sesión...");
 
@@ -244,17 +1011,15 @@ async function loginUser(e) {
 
     currentUser = data.user;
 
+    await loadProfile();
 
-await loadProfile();
+    if (!currentProfile) {
+      alert("Login correcto, pero no se pudo cargar el perfil.");
+      return;
+    }
 
-if (!currentProfile) {
-  alert("Login correcto, pero no se pudo cargar el perfil.");
-  return;
-}
-
-toast("Login correcto.");
-await loadDashboard();
-
+    toast("Login correcto.");
+    await loadDashboard();
   } catch (err) {
     console.error("Login fatal error:", err);
     alert("Error inesperado: " + err.message);
@@ -263,39 +1028,54 @@ await loadDashboard();
 
 async function logoutUser() {
   await sb.auth.signOut();
+
   currentUser = null;
   currentProfile = null;
+  currentPool = null;
+
   show("landingView");
 }
 
-async function createPool(e) {
-  e.preventDefault();
+async function createPool(event) {
+  event.preventDefault();
 
   const name = $("poolName").value.trim();
+  const competitionId = $("competitionSelect").value;
+
   if (name.length < 3) {
     toast("El nombre de la porra es demasiado corto.");
     return;
   }
 
+  if (!competitionId) {
+    toast("Selecciona una competición.");
+    return;
+  }
+
   const { data, error } = await sb.rpc("create_pool_with_owner", {
-    pool_name: name
+    pool_name: name,
+    competition_uuid: competitionId
   });
 
   if (error) {
+    console.error("Create pool error:", error);
     toast(error.message);
     return;
   }
 
   $("poolName").value = "";
+
   toast(`Porra creada. Código: ${data.invite_code}`);
+
   await renderPools();
   await openPool(data.id);
 }
 
-async function joinPool(e) {
-  e.preventDefault();
+async function joinPool(event) {
+  event.preventDefault();
 
   const code = cleanCode($("joinCode").value);
+
   if (!code) {
     toast("Introduce un código.");
     return;
@@ -306,26 +1086,20 @@ async function joinPool(e) {
   });
 
   if (error) {
+    console.error("Join pool error:", error);
     toast(error.message);
     return;
   }
 
   $("joinCode").value = "";
+
   toast("Ya formas parte de la porra.");
+
   await renderPools();
   await openPool(data);
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-// Música original NO. Esto genera un loop propio muy simple con Web Audio.
+// Música original NO. Esto genera un loop propio simple con Web Audio.
 let audioCtx = null;
 let loopTimer = null;
 
@@ -336,13 +1110,19 @@ function startMissionSound() {
   }
 
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  $("soundBtn").textContent = "🔇 Apagar modo misión";
+
+  const soundBtn = $("soundBtn");
+
+  if (soundBtn) {
+    soundBtn.textContent = "🔇 Apagar modo misión";
+  }
 
   let step = 0;
   const notes = [110, 110, 146.83, 164.81, 110, 82.41, 98, 110];
 
   function tick() {
     if (!audioCtx) return;
+
     const now = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -356,6 +1136,7 @@ function startMissionSound() {
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
+
     osc.start(now);
     osc.stop(now + 0.18);
 
@@ -367,45 +1148,78 @@ function startMissionSound() {
 }
 
 function stopMissionSound() {
-  if (loopTimer) clearInterval(loopTimer);
+  if (loopTimer) {
+    clearInterval(loopTimer);
+  }
+
   loopTimer = null;
-  if (audioCtx) audioCtx.close();
+
+  if (audioCtx) {
+    audioCtx.close();
+  }
+
   audioCtx = null;
-  $("soundBtn").textContent = "🔊 Activar modo misión";
+
+  const soundBtn = $("soundBtn");
+
+  if (soundBtn) {
+    soundBtn.textContent = "🔊 Activar modo misión";
+  }
 }
 
-$("showRegisterBtn").addEventListener("click", () => {
-  show("authView");
-  $("registerForm").classList.remove("hidden");
-  $("loginForm").classList.add("hidden");
-});
+function bindEvents() {
+  $("showRegisterBtn")?.addEventListener("click", () => {
+    show("authView");
+    $("registerForm")?.classList.remove("hidden");
+    $("loginForm")?.classList.add("hidden");
+  });
 
-$("showLoginBtn").addEventListener("click", () => {
-  show("authView");
-  $("loginForm").classList.remove("hidden");
-  $("registerForm").classList.add("hidden");
-});
+  $("showLoginBtn")?.addEventListener("click", () => {
+    show("authView");
+    $("loginForm")?.classList.remove("hidden");
+    $("registerForm")?.classList.add("hidden");
+  });
 
-$("goLoginBtn").addEventListener("click", () => {
-  $("registerForm").classList.add("hidden");
-  $("loginForm").classList.remove("hidden");
-});
+  $("goLoginBtn")?.addEventListener("click", () => {
+    $("registerForm")?.classList.add("hidden");
+    $("loginForm")?.classList.remove("hidden");
+  });
 
-$("goRegisterBtn").addEventListener("click", () => {
-  $("loginForm").classList.add("hidden");
-  $("registerForm").classList.remove("hidden");
-});
+  $("goRegisterBtn")?.addEventListener("click", () => {
+    $("loginForm")?.classList.add("hidden");
+    $("registerForm")?.classList.remove("hidden");
+  });
 
-$("registerForm").addEventListener("submit", registerUser);
-$("loginForm").addEventListener("submit", loginUser);
-$("logoutBtn").addEventListener("click", logoutUser);
-$("createPoolForm").addEventListener("submit", createPool);
-$("joinPoolForm").addEventListener("submit", joinPool);
-$("backDashboardBtn").addEventListener("click", loadDashboard);
-$("soundBtn").addEventListener("click", startMissionSound);
+  $("registerForm")?.addEventListener("submit", registerUser);
+  $("loginForm")?.addEventListener("submit", loginUser);
+  $("logoutBtn")?.addEventListener("click", logoutUser);
+  $("createPoolForm")?.addEventListener("submit", createPool);
+  $("joinPoolForm")?.addEventListener("submit", joinPool);
+
+  $("backDashboardBtn")?.addEventListener("click", loadDashboard);
+
+  $("backPoolBtn")?.addEventListener("click", () => {
+    if (currentPool) {
+      openPool(currentPool.id);
+    } else {
+      loadDashboard();
+    }
+  });
+
+  $("backPoolFromMyBetBtn")?.addEventListener("click", () => {
+    if (currentPool) {
+      openPool(currentPool.id);
+    } else {
+      loadDashboard();
+    }
+  });
+
+  $("soundBtn")?.addEventListener("click", startMissionSound);
+}
 
 sb.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
 });
 
+bindEvents();
 loadSession();
