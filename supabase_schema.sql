@@ -1,9 +1,14 @@
--- PORRA EQUIPO A — SUPABASE STARTER
--- Fase 1: Auth + perfiles + porras privadas + miembros + entrada con código.
--- Ejecutar en Supabase SQL Editor.
--- Importante: NO guardamos contraseñas. Supabase Auth las gestiona.
+-- PORRA EQUIPO A — SUPABASE STARTER CORREGIDO
+-- Ejecutar completo en Supabase SQL Editor.
 
 create extension if not exists pgcrypto;
+
+-- Limpieza opcional de objetos si estabas probando
+drop view if exists public.my_pools;
+drop function if exists public.join_pool_by_code(text);
+drop function if exists public.create_pool_with_owner(text);
+drop function if exists public.is_pool_admin(uuid);
+drop function if exists public.is_pool_member(uuid);
 
 -- =========================
 -- 1. PROFILES
@@ -16,7 +21,78 @@ create table if not exists public.profiles (
   created_at timestamptz default now()
 );
 
+-- =========================
+-- 2. POOLS
+-- =========================
+
+create table if not exists public.pools (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  invite_code text unique not null,
+  is_public boolean default false,
+  first_match_kickoff timestamptz,
+  predictions_close_at timestamptz,
+  created_at timestamptz default now()
+);
+
+-- =========================
+-- 3. POOL MEMBERS
+-- =========================
+
+create table if not exists public.pool_members (
+  id uuid primary key default gen_random_uuid(),
+  pool_id uuid not null references public.pools(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'member' check (role in ('owner', 'admin', 'member')),
+  joined_at timestamptz default now(),
+  unique(pool_id, user_id)
+);
+
+-- =========================
+-- 4. ACTIVAR RLS
+-- =========================
+
 alter table public.profiles enable row level security;
+alter table public.pools enable row level security;
+alter table public.pool_members enable row level security;
+
+-- =========================
+-- 5. FUNCIONES AUXILIARES
+-- =========================
+
+create or replace function public.is_pool_member(pool_uuid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.pool_members pm
+    where pm.pool_id = pool_uuid
+      and pm.user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.is_pool_admin(pool_uuid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.pool_members pm
+    where pm.pool_id = pool_uuid
+      and pm.user_id = auth.uid()
+      and pm.role in ('owner', 'admin')
+  );
+$$;
+
+-- =========================
+-- 6. POLICIES: PROFILES
+-- =========================
 
 drop policy if exists "Profiles are readable by authenticated users" on public.profiles;
 create policy "Profiles are readable by authenticated users"
@@ -40,54 +116,9 @@ to authenticated
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
-
 -- =========================
--- 2. POOLS
+-- 7. POLICIES: POOLS
 -- =========================
-
-create table if not exists public.pools (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  invite_code text unique not null,
-  is_public boolean default false,
-  first_match_kickoff timestamptz,
-  predictions_close_at timestamptz,
-  created_at timestamptz default now()
-);
-
-alter table public.pools enable row level security;
-
--- Helper: comprobar si el usuario pertenece a una porra.
-create or replace function public.is_pool_member(pool_uuid uuid)
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.pool_members pm
-    where pm.pool_id = pool_uuid
-      and pm.user_id = auth.uid()
-  );
-$$;
-
--- Helper: comprobar si el usuario es owner/admin de una porra.
-create or replace function public.is_pool_admin(pool_uuid uuid)
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.pool_members pm
-    where pm.pool_id = pool_uuid
-      and pm.user_id = auth.uid()
-      and pm.role in ('owner', 'admin')
-  );
-$$;
 
 drop policy if exists "Users can create own pools" on public.pools;
 create policy "Users can create own pools"
@@ -120,21 +151,9 @@ with check (
   or public.is_pool_admin(id)
 );
 
-
 -- =========================
--- 3. POOL MEMBERS
+-- 8. POLICIES: POOL MEMBERS
 -- =========================
-
-create table if not exists public.pool_members (
-  id uuid primary key default gen_random_uuid(),
-  pool_id uuid not null references public.pools(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null default 'member' check (role in ('owner', 'admin', 'member')),
-  joined_at timestamptz default now(),
-  unique(pool_id, user_id)
-);
-
-alter table public.pool_members enable row level security;
 
 drop policy if exists "Members can read members of their pools" on public.pool_members;
 create policy "Members can read members of their pools"
@@ -163,12 +182,9 @@ to authenticated
 using (public.is_pool_admin(pool_id))
 with check (public.is_pool_admin(pool_id));
 
-
 -- =========================
--- 4. JOIN POOL BY CODE
+-- 9. FUNCIÓN: ENTRAR CON CÓDIGO
 -- =========================
--- Esta función permite entrar con código después de login.
--- Devuelve el pool_id al que te has unido.
 
 create or replace function public.join_pool_by_code(code_input text)
 returns uuid
@@ -196,11 +212,9 @@ begin
 end;
 $$;
 
-
 -- =========================
--- 5. CREATE POOL WITH OWNER MEMBERSHIP
+-- 10. FUNCIÓN: CREAR PORRA + OWNER
 -- =========================
--- Crea porra y añade automáticamente al creador como owner.
 
 create or replace function public.create_pool_with_owner(pool_name text)
 returns public.pools
@@ -233,9 +247,8 @@ begin
 end;
 $$;
 
-
 -- =========================
--- 6. VIEW: MY POOLS
+-- 11. VIEW: MIS PORRAS
 -- =========================
 
 create or replace view public.my_pools as
