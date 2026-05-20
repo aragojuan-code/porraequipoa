@@ -1390,59 +1390,37 @@ async function joinPool(event) {
   await openPool(data);
 }
 
-let audioCtx = null;
-let loopTimer = null;
+const missionAudio = new Audio(
+  "https://rdoivmucgucouauyqdos.supabase.co/storage/v1/object/public/naojaguar/30.1s%20Recording%20(May%2020%20@%2011_39%20PM).mp3"
+);
+missionAudio.loop = true;
+missionAudio.volume = 0.45;
 
 function startMissionSound() {
-  if (audioCtx) {
+  const soundBtn = $("soundBtn");
+
+  if (!missionAudio.paused) {
     stopMissionSound();
     return;
   }
 
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-  const soundBtn = $("soundBtn");
-
-  if (soundBtn) {
-    soundBtn.textContent = "🔇 Apagar modo misión";
-  }
-
-  let step = 0;
-  const notes = [110, 110, 146.83, 164.81, 110, 82.41, 98, 110];
-
-  function tick() {
-    if (!audioCtx) return;
-
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = step % 4 === 0 ? "sawtooth" : "square";
-    osc.frequency.value = notes[step % notes.length];
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.055, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.18);
-
-    step += 1;
-  }
-
-  tick();
-  loopTimer = setInterval(tick, 220);
+  missionAudio.currentTime = 0;
+  missionAudio
+    .play()
+    .then(() => {
+      if (soundBtn) {
+        soundBtn.textContent = "🔇 Apagar modo misión";
+      }
+    })
+    .catch((error) => {
+      console.error("Mission audio play error:", error);
+      toast("No se pudo reproducir el audio de misión.");
+    });
 }
 
 function stopMissionSound() {
-  if (loopTimer) clearInterval(loopTimer);
-  loopTimer = null;
-
-  if (audioCtx) audioCtx.close();
-  audioCtx = null;
+  missionAudio.pause();
+  missionAudio.currentTime = 0;
 
   const soundBtn = $("soundBtn");
 
