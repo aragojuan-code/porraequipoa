@@ -137,6 +137,8 @@ function realScoreText(match) {
 async function loadSession() {
   const { data, error } = await sb.auth.getSession();
 
+  console.log("Session response:", { data, error });
+
   if (error) {
     console.error("Session error:", error);
     show("landingView");
@@ -145,20 +147,22 @@ async function loadSession() {
 
   currentUser = data.session?.user || null;
 
-  if (currentUser) {
-    await loadProfile();
-
-    if (!currentProfile) {
-      show("authView");
-      $("loginForm")?.classList.remove("hidden");
-      $("registerForm")?.classList.add("hidden");
-      return;
-    }
-
-    await loadDashboard();
-  } else {
+  if (!currentUser) {
     show("landingView");
+    return;
   }
+
+  await loadProfile();
+
+  if (!currentProfile) {
+    alert("Hay sesión iniciada, pero no se pudo cargar el perfil.");
+    show("authView");
+    $("loginForm")?.classList.remove("hidden");
+    $("registerForm")?.classList.add("hidden");
+    return;
+  }
+
+  await loadDashboard();
 }
 
 async function loadProfile() {
