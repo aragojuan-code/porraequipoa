@@ -25,6 +25,10 @@ body{overflow-x:hidden}
   padding:18px clamp(16px,4vw,48px);border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,rgba(20,20,24,.96),rgba(10,10,12,.88));
 }
+.small-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
 .brand{display:flex;gap:14px;align-items:center}
 .brand-mark{
   width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--red),var(--red2));
