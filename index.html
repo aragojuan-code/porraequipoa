@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Porra Equipo A</title>
+  <meta name="description" content="Crea tu porra privada, invita amigos y compite prediciendo resultados." />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div>
+        <div class="brand-title">Porra Equipo A</div>
+        <div class="brand-subtitle">Plan perfecto. Resultado imposible.</div>
+      </div>
+    </div>
+    <button id="soundBtn" class="ghost-btn" type="button">🔊 Activar modo misión</button>
+  </header>
+
+  <main class="shell">
+    <section id="landingView" class="hero view">
+      <div class="hero-card">
+        <div class="tag">NAOJAGUAR // PRIVATE POOLS</div>
+        <h1>Tu porra privada con estética de misión.</h1>
+        <p>
+          Regístrate, crea una porra, invita con código y prepara tus predicciones.
+          Las apuestas quedarán bloqueadas antes del inicio de la competición.
+        </p>
+        <div class="hero-actions">
+          <button id="showRegisterBtn" class="primary-btn" type="button">Crear cuenta</button>
+          <button id="showLoginBtn" class="secondary-btn" type="button">Iniciar sesión</button>
+        </div>
+      </div>
+
+      <div class="mission-panel">
+        <div class="panel-title">REGLAS BASE</div>
+        <ul>
+          <li>Web pública, porras privadas.</li>
+          <li>Entrar con código solo después del login.</li>
+          <li>Resultado exacto: 3 puntos.</li>
+          <li>Signo acertado: 1 punto.</li>
+          <li>Telegram queda fuera de la primera versión.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="authView" class="view hidden">
+      <div class="auth-grid">
+        <form id="registerForm" class="card hidden">
+          <div class="card-kicker">NUEVO RECLUTA</div>
+          <h2>Crear cuenta</h2>
+          <label>Email</label>
+          <input id="regEmail" type="email" required placeholder="tu@email.com" autocomplete="email" />
+          <label>Nombre de usuario</label>
+          <input id="regUsername" type="text" required placeholder="hannibal" autocomplete="nickname" />
+          <label>Nombre visible</label>
+          <input id="regDisplayName" type="text" required placeholder="Juan" autocomplete="name" />
+          <label>Contraseña</label>
+          <input id="regPassword" type="password" required minlength="6" placeholder="mínimo 6 caracteres" autocomplete="new-password" />
+          <button class="primary-btn full" type="submit">Registrarme</button>
+          <button id="goLoginBtn" class="link-btn" type="button">Ya tengo cuenta</button>
+        </form>
+
+        <form id="loginForm" class="card hidden">
+          <div class="card-kicker">ACCESO A BASE</div>
+          <h2>Iniciar sesión</h2>
+          <label>Email</label>
+          <input id="loginEmail" type="email" required placeholder="tu@email.com" autocomplete="email" />
+          <label>Contraseña</label>
+          <input id="loginPassword" type="password" required placeholder="••••••••" autocomplete="current-password" />
+          <button class="primary-btn full" type="submit">Entrar</button>
+          <button id="goRegisterBtn" class="link-btn" type="button">Crear cuenta nueva</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="dashboardView" class="view hidden">
+      <div class="dashboard-head">
+        <div>
+          <div class="tag">BASE DE OPERACIONES</div>
+          <h1>Mis porras</h1>
+          <p id="userLine" class="muted"></p>
+        </div>
+        <button id="logoutBtn" class="ghost-btn danger" type="button">Salir</button>
+      </div>
+
+      <div class="ops-grid">
+        <form id="createPoolForm" class="card">
+          <div class="card-kicker">CREAR MISIÓN</div>
+          <h2>Nueva porra privada</h2>
+          <label>Nombre de la porra</label>
+          <input id="poolName" type="text" required placeholder="Eurocopa Equipo A" />
+          <button class="primary-btn full" type="submit">Crear porra</button>
+        </form>
+
+        <form id="joinPoolForm" class="card">
+          <div class="card-kicker">ENTRAR CON CÓDIGO</div>
+          <h2>Unirse a una porra</h2>
+          <label>Código de invitación</label>
+          <input id="joinCode" type="text" required placeholder="ATEAM-ABC123" />
+          <button class="secondary-btn full" type="submit">Entrar en porra</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-kicker">PORRAS ACTIVAS</div>
+        <div id="poolsList" class="pool-list"></div>
+      </div>
+    </section>
+
+    <section id="poolView" class="view hidden">
+      <button id="backDashboardBtn" class="ghost-btn" type="button">← Volver</button>
+      <div id="poolDetail" class="pool-detail"></div>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
