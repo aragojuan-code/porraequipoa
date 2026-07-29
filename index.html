@@ -1,25 +1,237 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Porra Equipo A</title>
-  <meta name="description" content="Crea tu porra privada, invita amigos y compite prediciendo resultados." />
-  <link rel="stylesheet" href="./styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Puzle de tres hexágonos</title>
+<style>
+:root{--bg:#f1eee7;--panel:#fffdf8;--ink:#1d1d1b;--muted:#777168;--border:#d3ccbf;--accent:#6d28d9;--good:#0f766e;--near:#b45309;--piece1:#fff9ed;--piece2:#f7fbff;--piece3:#fff8f4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:20px}h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2.25rem)}p{line-height:1.45}.sub{margin:0 0 16px;color:var(--muted)}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}button,label{border:1px solid var(--border);border-radius:999px;background:var(--panel);padding:9px 14px;font:inherit;cursor:pointer}button.primary{background:var(--ink);color:white;border-color:var(--ink)}label{display:flex;align-items:center;gap:7px}.stage{background:var(--panel);border:1px solid var(--border);border-radius:24px;overflow:hidden}canvas{display:block;width:100%;height:auto;touch-action:manipulation}.info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}.small{font-size:.9rem;color:var(--muted);margin-top:4px}.status{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}@media(max-width:720px){main{padding:10px}.info{grid-template-columns:1fr}button,label{font-size:.92rem;padding:8px 11px}}
+</style>
 </head>
 <body>
-  <div class="noise"></div>
-  <header class="topbar"><div class="brand"><div class="brand-mark">A</div><div><div class="brand-title">Porra Equipo A</div><div class="brand-subtitle">Plan perfecto. Resultado imposible.</div></div></div><button id="soundBtn" class="ghost-btn" type="button">🔊 Activar modo misión</button></header>
-  <main class="shell">
-    <section id="landingView" class="hero view"><div class="hero-card"><div class="tag">NAOJAGUAR // PRIVATE POOLS</div><h1>Tu porra privada con estética de misión.</h1><p>Regístrate, crea una porra, invita con código y prepara tus predicciones. Las apuestas quedarán bloqueadas antes del inicio de la competición.</p><div class="hero-actions"><button id="showRegisterBtn" class="primary-btn" type="button">Crear cuenta</button><button id="showLoginBtn" class="secondary-btn" type="button">Iniciar sesión</button></div></div><div class="mission-panel"><div class="panel-title">REGLAS BASE</div><ul><li>Web pública, porras privadas.</li><li>Entrar con código solo después del login.</li><li>Resultado exacto: 3 puntos.</li><li>Signo acertado: 1 punto.</li><li>Pichichi: +1 por gol y +5 si acaba máximo goleador.</li></ul></div></section>
-    <section id="authView" class="view hidden"><div class="auth-grid"><form id="registerForm" class="card hidden"><div class="card-kicker">NUEVO RECLUTA</div><h2>Crear cuenta</h2><label>Email</label><input id="regEmail" type="email" required placeholder="tu@email.com" autocomplete="email" /><label>Nombre visible</label><input id="regDisplayName" type="text" required placeholder="Ej. Juan, Hannibal, M.A." autocomplete="name" /><p class="muted small-note">Este será tu nombre visible en todas tus porras privadas. No puede estar repetido.</p><label>Contraseña</label><input id="regPassword" type="password" required minlength="6" placeholder="mínimo 6 caracteres" autocomplete="new-password" /><button class="primary-btn full" type="submit">Registrarme</button><button id="goLoginBtn" class="link-btn" type="button">Ya tengo cuenta</button></form><form id="loginForm" class="card hidden"><div class="card-kicker">ACCESO A BASE</div><h2>Iniciar sesión</h2><label>Email</label><input id="loginEmail" type="email" required placeholder="tu@email.com" autocomplete="email" /><label>Contraseña</label><input id="loginPassword" type="password" required placeholder="••••••••" autocomplete="current-password" /><button class="primary-btn full" type="submit">Entrar</button><button id="goRegisterBtn" class="link-btn" type="button">Crear cuenta nueva</button></form></div></section>
-    <section id="dashboardView" class="view hidden"><div class="dashboard-head"><div><div class="tag">BASE DE OPERACIONES</div><h1>Mis porras</h1><p id="userLine" class="muted"></p></div><button id="logoutBtn" class="ghost-btn danger" type="button">Salir</button></div><div class="ops-grid"><form id="createPoolForm" class="card"><div class="card-kicker">CREAR MISIÓN</div><h2>Nueva porra privada</h2><label>Nombre de la porra</label><input id="poolName" type="text" required placeholder="Eurocopa Equipo A" /><label>Competición</label><select id="competitionSelect" required></select><button class="primary-btn full" type="submit">Crear porra</button></form><form id="joinPoolForm" class="card"><div class="card-kicker">ENTRAR CON CÓDIGO</div><h2>Unirse a una porra</h2><label>Código de invitación</label><input id="joinCode" type="text" required placeholder="ATEAM-ABC123" /><button class="secondary-btn full" type="submit">Entrar en porra</button></form></div><div class="card"><div class="card-kicker">PORRAS ACTIVAS</div><div id="poolsList" class="pool-list"></div></div></section>
-    <section id="poolView" class="view hidden"><button id="backDashboardBtn" class="ghost-btn" type="button">← Volver</button><div id="poolDetail" class="pool-detail"></div></section>
-    <section id="betView" class="view hidden"><button id="backPoolBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="betContent" class="pool-detail"></div></section>
-    <section id="myBetView" class="view hidden"><button id="backPoolFromMyBetBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="myBetContent" class="pool-detail"></div></section>
-    <section id="rankingView" class="view hidden"><button id="backPoolFromRankingBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="rankingContent" class="pool-detail"></div></section>
-    <section id="adminResultsView" class="view hidden"><button id="backPoolFromAdminBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="adminResultsContent" class="pool-detail"></div></section>
-    <div id="toast" class="toast hidden"></div>
-  </main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./config.js"></script><script src="./app.js"></script>
-</body></html>
+<main>
+<h1>Circunferencia entre tres hexágonos</h1>
+<p class="sub">Selecciona una pieza con un clic o con Tab. Gírala en cualquiera de los dos sentidos, o selecciona otra pieza para intercambiarlas.</p>
+<div class="toolbar">
+  <button id="left" aria-label="Girar pieza seleccionada a la izquierda">↺ Girar izquierda</button>
+  <button id="right" aria-label="Girar pieza seleccionada a la derecha">Girar derecha ↻</button>
+  <button id="mix">Nueva mezcla</button>
+</div>
+<div class="stage"><canvas id="board" width="1000" height="780" tabindex="0" aria-label="Puzle de tres hexágonos. Usa Tab para cambiar la selección y las flechas izquierda y derecha para girar."></canvas></div>
+<div id="status" class="status" aria-live="polite">Selecciona una pieza para comenzar.</div>
+</main>
+<script>
+(()=>{
+const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height,O={x:500,y:390},R=205;
+const LINE=R/10; // grosor = un décimo exacto de la arista
+const state={selected:null,moves:0};
+const fills=['#fff9ed','#f7fbff','#fff8f4'];
+const centerDirections=[-90,30,150];
+const slotGeom=centerDirections.map((a,i)=>{const t=rad(a);return{slot:i,cx:O.x+R*Math.cos(t),cy:O.y+R*Math.sin(t),base:a+180};});
+const pieces=centerDirections.map((a,i)=>{const g=slotGeom[i];return{cx:g.cx,cy:g.cy,base:g.base,rotation:0,index:i,slot:i};});
+
+// Posiciones 1, 2 y 3: centros de los segmentos 7, 8 y 9,
+// contando desde el vértice central O hacia el exterior.
+const POS={1:.65,2:.75,3:.85};
+const sharedRays=[-30,90,210]; // AB, BC, CA
+const sharedValues=[2,3,1];    // puntos de la circunferencia ganadora
+
+function rad(d){return d*Math.PI/180}
+function rotPoint(v,deg){const a=rad(deg),c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function pointOnRay(angleDeg,value){const d=R*POS[value],a=rad(angleDeg);return{x:O.x+d*Math.cos(a),y:O.y+d*Math.sin(a)}}
+function circleThrough3(a,b,c){
+  const d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));
+  const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;
+  const x=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d;
+  const y=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;
+  return{x,y,r:dist({x,y},a)};
+}
+function reflectAcrossRay(pt,origin,angleDeg){
+  const q=rotPoint({x:pt.x-origin.x,y:pt.y-origin.y},-angleDeg);
+  const w=rotPoint({x:q.x,y:-q.y},angleDeg);
+  return{x:origin.x+w.x,y:origin.y+w.y};
+}
+function vertices(p){const pts=[],start=rad(p.base+p.rotation);for(let i=0;i<6;i++){const a=start+i*Math.PI/3;pts.push({x:p.cx+R*Math.cos(a),y:p.cy+R*Math.sin(a)});}return pts}
+function pathPoly(pts){ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath()}
+function worldFromLocal(p,v){const q=rotPoint(v,p.base+p.rotation);return{x:p.cx+q.x,y:p.cy+q.y}}
+function localFromWorld(p,v,activeRotation){return rotPoint({x:v.x-p.cx,y:v.y-p.cy},-(p.base+activeRotation))}
+function inside(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a.y>pt.y)!=(b.y>pt.y))&&(pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x))c=!c;}return c}
+
+// Una única circunferencia ganadora pasa por los tres puntos compartidos.
+const winPts=sharedRays.map((a,i)=>pointOnRay(a,sharedValues[i]));
+const solutionCircle=circleThrough3(...winPts);
+
+// Cada pieza, en orientación de solución, ve dos de esos tres rayos.
+const pieceEdges=[[-30,210],[-30,90],[90,210]];
+const winnerPairs=[[2,1],[2,3],[3,1]];
+const concentricValues=[1,2,3];
+
+const curveDefs=pieces.map((p,i)=>{
+  const edges=pieceEdges[i];
+  const winner={type:'ganadora',pair:`${winnerPairs[i][0]}–${winnerPairs[i][1]}`,activeRotation:0,circle:solutionCircle,
+    endpoints:[pointOnRay(edges[0],winnerPairs[i][0]),pointOnRay(edges[1],winnerPairs[i][1])]};
+
+  // Reflejo exacto del arco ganador respecto a la bisectriz del vértice central.
+  let bisector;
+  if(i===0) bisector=-90; else if(i===1) bisector=30; else bisector=150;
+  const mc=reflectAcrossRay(solutionCircle,O,bisector);
+  const mirror={type:'equivalente',pair:`${winnerPairs[i][1]}–${winnerPairs[i][0]}`,activeRotation:240,circle:{x:mc.x,y:mc.y,r:solutionCircle.r},
+    endpoints:[pointOnRay(edges[0],winnerPairs[i][1]),pointOnRay(edges[1],winnerPairs[i][0])]};
+
+  const v=concentricValues[i];
+  const concentric={type:'concéntrica',pair:`${v}–${v}`,activeRotation:120,circle:{x:O.x,y:O.y,r:R*POS[v]},
+    endpoints:[pointOnRay(edges[0],v),pointOnRay(edges[1],v)]};
+  return[winner,mirror,concentric];
+});
+
+// Convierte cada arco a coordenadas locales de la pieza en su orientación física.
+for(const p of pieces){
+  for(const d of curveDefs[p.index]){
+    d.localCenter=localFromWorld(p,d.circle,d.activeRotation);
+    d.localEnds=d.endpoints.map(e=>localFromWorld(p,e,d.activeRotation));
+    const c=d.circle,e0=d.endpoints[0],e1=d.endpoints[1];
+    d.a0=Math.atan2(e0.y-c.y,e0.x-c.x);
+    d.a1=Math.atan2(e1.y-c.y,e1.x-c.x);
+    // Elegimos el arco cuya mitad queda dentro del hexágono activo.
+    const poly=vertices({...p,rotation:d.activeRotation});
+    const midCW=(d.a0+((d.a1-d.a0+Math.PI*2)%(Math.PI*2))/2);
+    const midCCW=(d.a0-((d.a0-d.a1+Math.PI*2)%(Math.PI*2))/2);
+    const m1={x:c.x+c.r*Math.cos(midCW),y:c.y+c.r*Math.sin(midCW)};
+    const m2={x:c.x+c.r*Math.cos(midCCW),y:c.y+c.r*Math.sin(midCCW)};
+    d.ccw=inside(m2,poly)&&!inside(m1,poly);
+  }
+}
+
+function activeSlot(p){return p.rotation===0?0:p.rotation===120?2:1}
+function curveWorld(p,slot){
+  const d=curveDefs[p.index][slot],c=worldFromLocal(p,d.localCenter),ends=d.localEnds.map(e=>worldFromLocal(p,e));
+  const rot=rad(p.base+p.rotation)-rad(p.base+d.activeRotation);
+  return{data:d,circle:{x:c.x,y:c.y,r:d.circle.r},ends,a0:d.a0+rot,a1:d.a1+rot,ccw:d.ccw};
+}
+
+function drawArc(p,slot){
+  const poly=vertices(p),g=curveWorld(p,slot),d=g.data;
+  ctx.save();pathPoly(poly);ctx.clip();
+  ctx.beginPath();ctx.arc(g.circle.x,g.circle.y,g.circle.r,g.a0,g.a1,g.ccw);
+  let color='#242422',dash=[];
+  if(state.classify){
+    if(d.type==='ganadora')color='#0f766e';
+    else if(d.type==='equivalente'){color='#b45309';dash=[18,10]}
+    else{color='#6b7280';dash=[5,11]}
+  }
+  ctx.strokeStyle=color;ctx.lineWidth=LINE;ctx.lineCap='butt';ctx.setLineDash(dash);ctx.stroke();ctx.restore();
+
+
+}
+
+function drawEdgeScale(p){
+  return;
+  const poly=vertices(p);
+  // Solo marcamos las dos aristas que llegan al vértice central actual.
+  let oi=0,best=Infinity;for(let i=0;i<6;i++){const d=dist(poly[i],O);if(d<best){best=d;oi=i}}
+  const V=poly[oi],neighbors=[poly[(oi+5)%6],poly[(oi+1)%6]];
+  for(const E of neighbors){
+    ctx.save();ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let s=1;s<=10;s++){
+      const f=(s-.5)/10,x=V.x+(E.x-V.x)*f,y=V.y+(E.y-V.y)*f;
+      const dx=E.x-V.x,dy=E.y-V.y,L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;
+      ctx.strokeStyle=s>=7&&s<=9?'rgba(109,40,217,.55)':'rgba(60,55,48,.18)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x-nx*5,y-ny*5);ctx.lineTo(x+nx*5,y+ny*5);ctx.stroke();
+      if(s>=7&&s<=9){const val=s-6;ctx.fillStyle='#6d28d9';ctx.fillText(String(val),x+nx*14,y+ny*14)}
+    }
+    ctx.restore();
+  }
+}
+
+function drawPiece(p){
+  const poly=vertices(p);
+  ctx.save();pathPoly(poly);ctx.fillStyle=fills[p.index];ctx.fill();ctx.strokeStyle='#242422';ctx.lineWidth=3;ctx.stroke();ctx.restore();
+  for(let slot=0;slot<3;slot++)drawArc(p,slot);
+  if(state.selected===p.index){
+    ctx.save();pathPoly(poly);ctx.strokeStyle='#6d28d9';ctx.lineWidth=8;ctx.setLineDash([18,10]);ctx.stroke();ctx.restore();
+  }
+}
+
+function endpointOnSharedRay(curve,angle){
+  const a=rad(angle),ux=Math.cos(a),uy=Math.sin(a);let best=null;
+  for(const e of curve.ends){
+    const vx=e.x-O.x,vy=e.y-O.y,t=vx*ux+vy*uy,off=Math.abs(vx*uy-vy*ux);
+    if(t>=0&&off<4&&(best===null||off<best.off))best={t,off};
+  }
+  return best?best.t:null;
+}
+function edgeMatches(){
+  const bySlot=[...pieces].sort((a,b)=>a.slot-b.slot);
+  const curves=bySlot.map((p)=>curveWorld(p,activeSlot(p)));
+  const pairs=[[0,1],[1,2],[2,0]];
+  return pairs.map((pair,i)=>{
+    const a=endpointOnSharedRay(curves[pair[0]],sharedRays[i]);
+    const b=endpointOnSharedRay(curves[pair[1]],sharedRays[i]);
+    const diff=(a==null||b==null)?Infinity:Math.abs(a-b);
+    const steps=Number.isFinite(diff)?Math.round(diff/(R/10)):99;
+    return{pair,angle:sharedRays[i],a,b,diff,steps,ok:diff<1.5,near:diff<LINE*1.25};
+  });
+}
+function solved(){return edgeMatches().every(e=>e.ok)}
+function draw(){
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#eee8dc';ctx.fillRect(0,0,W,H);
+  [...pieces].sort((a,b)=>a.slot-b.slot).forEach(drawPiece);
+  const status=document.getElementById('status');
+  if(solved()){
+    status.innerHTML=`<strong>¡Resuelto!</strong> Has cerrado la circunferencia en ${state.moves} movimientos.`;
+  }else if(state.selected===null){
+    status.textContent=`Movimientos: ${state.moves}. Selecciona una pieza con clic o Tab.`;
+  }else{
+    status.textContent=`Movimientos: ${state.moves}. Pieza seleccionada: gira con ←/→ o haz clic en otra para intercambiarlas.`;
+  }
+}
+
+function pointer(ev){const r=canvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*W/r.width,y:(ev.clientY-r.top)*H/r.height}}
+function selectedPiece(){return pieces.find(p=>p.index===state.selected)||null}
+function selectPiece(p){
+  if(state.selected===null){state.selected=p.index;draw();return;}
+  const current=selectedPiece();
+  if(current.index===p.index){draw();return;}
+  const a={cx:current.cx,cy:current.cy,base:current.base,slot:current.slot};
+  current.cx=p.cx;current.cy=p.cy;current.base=p.base;current.slot=p.slot;
+  p.cx=a.cx;p.cy=a.cy;p.base=a.base;p.slot=a.slot;
+  state.selected=p.index;state.moves++;draw();
+}
+function rotateSelected(dir){
+  const p=selectedPiece();if(!p)return;
+  p.rotation=(p.rotation+(dir>0?120:240))%360;state.moves++;draw();
+}
+function scramble(){
+  const perm=[2,0,1],rots=[120,240,120];
+  pieces.forEach((p,i)=>{const g=slotGeom[perm[i]];p.cx=g.cx;p.cy=g.cy;p.base=g.base;p.slot=g.slot;p.rotation=rots[i];});
+  if(solved())pieces[0].rotation=(pieces[0].rotation+120)%360;
+  state.selected=null;state.moves=0;draw();
+}
+canvas.addEventListener('pointerdown',e=>{const q=pointer(e),p=[...pieces].reverse().find(x=>inside(q,vertices(x)));if(p)selectPiece(p);canvas.focus();});
+canvas.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const order=[...pieces].sort((a,b)=>a.slot-b.slot);
+    const idx=state.selected===null?-1:order.findIndex(p=>p.index===state.selected);
+    state.selected=order[(idx+(e.shiftKey?-1:1)+order.length)%order.length].index;draw();
+  }else if(e.key==='ArrowLeft'){e.preventDefault();rotateSelected(-1)}
+  else if(e.key==='ArrowRight'){e.preventDefault();rotateSelected(1)}
+  else if(e.key==='Enter'||e.key===' '){e.preventDefault();rotateSelected(1)}
+});
+document.getElementById('left').addEventListener('click',()=>rotateSelected(-1));
+document.getElementById('right').addEventListener('click',()=>rotateSelected(1));
+document.getElementById('mix').addEventListener('click',()=>{
+  const slots=[0,1,2].sort(()=>Math.random()-.5);
+  pieces.forEach((p,i)=>{const g=slotGeom[slots[i]];p.cx=g.cx;p.cy=g.cy;p.base=g.base;p.slot=g.slot;p.rotation=120*Math.floor(Math.random()*3);});
+  if(solved())pieces[0].rotation=(pieces[0].rotation+120)%360;
+  state.selected=null;state.moves=0;draw();canvas.focus();
+});
+scramble();
+draw();
+})();
+</script>
+</body>
+</html>
