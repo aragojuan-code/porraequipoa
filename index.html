@@ -4,234 +4,1000 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Puzle de tres hexágonos</title>
+
 <style>
-:root{--bg:#f1eee7;--panel:#fffdf8;--ink:#1d1d1b;--muted:#777168;--border:#d3ccbf;--accent:#6d28d9;--good:#0f766e;--near:#b45309;--piece1:#fff9ed;--piece2:#f7fbff;--piece3:#fff8f4}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:20px}h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2.25rem)}p{line-height:1.45}.sub{margin:0 0 16px;color:var(--muted)}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}button,label{border:1px solid var(--border);border-radius:999px;background:var(--panel);padding:9px 14px;font:inherit;cursor:pointer}button.primary{background:var(--ink);color:white;border-color:var(--ink)}label{display:flex;align-items:center;gap:7px}.stage{background:var(--panel);border:1px solid var(--border);border-radius:24px;overflow:hidden}canvas{display:block;width:100%;height:auto;touch-action:manipulation}.info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}.small{font-size:.9rem;color:var(--muted);margin-top:4px}.status{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}@media(max-width:720px){main{padding:10px}.info{grid-template-columns:1fr}button,label{font-size:.92rem;padding:8px 11px}}
+:root {
+  --bg: #f1eee7;
+  --panel: #fffdf8;
+  --ink: #1d1d1b;
+  --muted: #777168;
+  --border: #d3ccbf;
+  --accent: #6d28d9;
+  --piece1: #fff9ed;
+  --piece2: #f7fbff;
+  --piece3: #fff8f4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+p {
+  line-height: 1.45;
+}
+
+.sub {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.toolbar {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  padding: 9px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.stage {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: manipulation;
+}
+
+.status {
+  margin-top: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+@media (max-width: 720px) {
+  main {
+    padding: 10px;
+  }
+
+  button {
+    font-size: 0.92rem;
+    padding: 8px 11px;
+  }
+}
 </style>
 </head>
+
 <body>
 <main>
+
 <h1>Circunferencia entre tres hexágonos</h1>
-<p class="sub">Selecciona una pieza con un clic o con Tab. Gírala en cualquiera de los dos sentidos, o selecciona otra pieza para intercambiarlas.</p>
+
+<p class="sub">
+  Selecciona una pieza con un clic o con Tab. Gírala en cualquiera de los dos
+  sentidos, o selecciona otra pieza para intercambiarlas.
+</p>
+
 <div class="toolbar">
-  <button id="left" aria-label="Girar pieza seleccionada a la izquierda">↺ Girar izquierda</button>
-  <button id="right" aria-label="Girar pieza seleccionada a la derecha">Girar derecha ↻</button>
+  <button id="left">↺ Girar izquierda</button>
+  <button id="right">Girar derecha ↻</button>
   <button id="mix">Nueva mezcla</button>
 </div>
-<div class="stage"><canvas id="board" width="1000" height="780" tabindex="0" aria-label="Puzle de tres hexágonos. Usa Tab para cambiar la selección y las flechas izquierda y derecha para girar."></canvas></div>
-<div id="status" class="status" aria-live="polite">Selecciona una pieza para comenzar.</div>
+
+<div class="stage">
+  <canvas
+    id="board"
+    width="1000"
+    height="820"
+    tabindex="0"
+    aria-label="Puzle de tres hexágonos"
+  ></canvas>
+</div>
+
+<div id="status" class="status" aria-live="polite">
+  Selecciona una pieza para comenzar.
+</div>
+
 </main>
+
 <script>
-(()=>{
-const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
-const W=canvas.width,H=canvas.height,O={x:500,y:390},R=205;
-const LINE=R/10; // grosor = un décimo exacto de la arista
-const state={selected:null,moves:0};
-const fills=['#fff9ed','#f7fbff','#fff8f4'];
-const centerDirections=[-90,30,150];
-const slotGeom=centerDirections.map((a,i)=>{const t=rad(a);return{slot:i,cx:O.x+R*Math.cos(t),cy:O.y+R*Math.sin(t),base:a+180};});
-const pieces=centerDirections.map((a,i)=>{const g=slotGeom[i];return{cx:g.cx,cy:g.cy,base:g.base,rotation:0,index:i,slot:i};});
+(() => {
+  const canvas = document.getElementById("board");
+  const ctx = canvas.getContext("2d");
 
-// Posiciones 1, 2 y 3: centros de los segmentos 7, 8 y 9,
-// contando desde el vértice central O hacia el exterior.
-const POS={1:.65,2:.75,3:.85};
-const sharedRays=[-30,90,210]; // AB, BC, CA
-const sharedValues=[2,3,1];    // puntos de la circunferencia ganadora
+  const W = canvas.width;
+  const H = canvas.height;
 
-function rad(d){return d*Math.PI/180}
-function rotPoint(v,deg){const a=rad(deg),c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c}}
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-function pointOnRay(angleDeg,value){const d=R*POS[value],a=rad(angleDeg);return{x:O.x+d*Math.cos(a),y:O.y+d*Math.sin(a)}}
-function circleThrough3(a,b,c){
-  const d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));
-  const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;
-  const x=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d;
-  const y=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;
-  return{x,y,r:dist({x,y},a)};
-}
-function reflectAcrossRay(pt,origin,angleDeg){
-  const q=rotPoint({x:pt.x-origin.x,y:pt.y-origin.y},-angleDeg);
-  const w=rotPoint({x:q.x,y:-q.y},angleDeg);
-  return{x:origin.x+w.x,y:origin.y+w.y};
-}
-function vertices(p){const pts=[],start=rad(p.base+p.rotation);for(let i=0;i<6;i++){const a=start+i*Math.PI/3;pts.push({x:p.cx+R*Math.cos(a),y:p.cy+R*Math.sin(a)});}return pts}
-function pathPoly(pts){ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath()}
-function worldFromLocal(p,v){const q=rotPoint(v,p.base+p.rotation);return{x:p.cx+q.x,y:p.cy+q.y}}
-function localFromWorld(p,v,activeRotation){return rotPoint({x:v.x-p.cx,y:v.y-p.cy},-(p.base+activeRotation))}
-function inside(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a.y>pt.y)!=(b.y>pt.y))&&(pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x))c=!c;}return c}
+  const O = {
+    x: 500,
+    y: 430
+  };
 
-// Una única circunferencia ganadora pasa por los tres puntos compartidos.
-const winPts=sharedRays.map((a,i)=>pointOnRay(a,sharedValues[i]));
-const solutionCircle=circleThrough3(...winPts);
+  const R = 195;
 
-// Cada pieza, en orientación de solución, ve dos de esos tres rayos.
-const pieceEdges=[[-30,210],[-30,90],[90,210]];
-const winnerPairs=[[2,1],[2,3],[3,1]];
-const concentricValues=[1,2,3];
+  // Grosor exacto: un décimo de la arista.
+  const LINE = R / 10;
 
-const curveDefs=pieces.map((p,i)=>{
-  const edges=pieceEdges[i];
-  const winner={type:'ganadora',pair:`${winnerPairs[i][0]}–${winnerPairs[i][1]}`,activeRotation:0,circle:solutionCircle,
-    endpoints:[pointOnRay(edges[0],winnerPairs[i][0]),pointOnRay(edges[1],winnerPairs[i][1])]};
+  const state = {
+    selected: null,
+    moves: 0
+  };
 
-  // Reflejo exacto del arco ganador respecto a la bisectriz del vértice central.
-  let bisector;
-  if(i===0) bisector=-90; else if(i===1) bisector=30; else bisector=150;
-  const mc=reflectAcrossRay(solutionCircle,O,bisector);
-  const mirror={type:'equivalente',pair:`${winnerPairs[i][1]}–${winnerPairs[i][0]}`,activeRotation:240,circle:{x:mc.x,y:mc.y,r:solutionCircle.r},
-    endpoints:[pointOnRay(edges[0],winnerPairs[i][1]),pointOnRay(edges[1],winnerPairs[i][0])]};
+  const fills = [
+    "#fff9ed",
+    "#f7fbff",
+    "#fff8f4"
+  ];
 
-  const v=concentricValues[i];
-  const concentric={type:'concéntrica',pair:`${v}–${v}`,activeRotation:120,circle:{x:O.x,y:O.y,r:R*POS[v]},
-    endpoints:[pointOnRay(edges[0],v),pointOnRay(edges[1],v)]};
-  return[winner,mirror,concentric];
-});
+  const centerDirections = [-90, 30, 150];
 
-// Convierte cada arco a coordenadas locales de la pieza en su orientación física.
-for(const p of pieces){
-  for(const d of curveDefs[p.index]){
-    d.localCenter=localFromWorld(p,d.circle,d.activeRotation);
-    d.localEnds=d.endpoints.map(e=>localFromWorld(p,e,d.activeRotation));
-    const c=d.circle,e0=d.endpoints[0],e1=d.endpoints[1];
-    d.a0=Math.atan2(e0.y-c.y,e0.x-c.x);
-    d.a1=Math.atan2(e1.y-c.y,e1.x-c.x);
-    // Elegimos el arco cuya mitad queda dentro del hexágono activo.
-    const poly=vertices({...p,rotation:d.activeRotation});
-    const midCW=(d.a0+((d.a1-d.a0+Math.PI*2)%(Math.PI*2))/2);
-    const midCCW=(d.a0-((d.a0-d.a1+Math.PI*2)%(Math.PI*2))/2);
-    const m1={x:c.x+c.r*Math.cos(midCW),y:c.y+c.r*Math.sin(midCW)};
-    const m2={x:c.x+c.r*Math.cos(midCCW),y:c.y+c.r*Math.sin(midCCW)};
-    d.ccw=inside(m2,poly)&&!inside(m1,poly);
+  function rad(degrees) {
+    return degrees * Math.PI / 180;
   }
-}
 
-function activeSlot(p){return p.rotation===0?0:p.rotation===120?2:1}
-function curveWorld(p,slot){
-  const d=curveDefs[p.index][slot],c=worldFromLocal(p,d.localCenter),ends=d.localEnds.map(e=>worldFromLocal(p,e));
-  const rot=rad(p.base+p.rotation)-rad(p.base+d.activeRotation);
-  return{data:d,circle:{x:c.x,y:c.y,r:d.circle.r},ends,a0:d.a0+rot,a1:d.a1+rot,ccw:d.ccw};
-}
+  function rotPoint(point, degrees) {
+    const angle = rad(degrees);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
 
-function drawArc(p,slot){
-  const poly=vertices(p),g=curveWorld(p,slot),d=g.data;
-  ctx.save();pathPoly(poly);ctx.clip();
-  ctx.beginPath();ctx.arc(g.circle.x,g.circle.y,g.circle.r,g.a0,g.a1,g.ccw);
-  let color='#242422',dash=[];
-  if(state.classify){
-    if(d.type==='ganadora')color='#0f766e';
-    else if(d.type==='equivalente'){color='#b45309';dash=[18,10]}
-    else{color='#6b7280';dash=[5,11]}
+    return {
+      x: point.x * cos - point.y * sin,
+      y: point.x * sin + point.y * cos
+    };
   }
-  ctx.strokeStyle=color;ctx.lineWidth=LINE;ctx.lineCap='butt';ctx.setLineDash(dash);ctx.stroke();ctx.restore();
 
+  function dist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
 
-}
+  const slotGeom = centerDirections.map((angle, index) => {
+    const theta = rad(angle);
 
-function drawEdgeScale(p){
-  return;
-  const poly=vertices(p);
-  // Solo marcamos las dos aristas que llegan al vértice central actual.
-  let oi=0,best=Infinity;for(let i=0;i<6;i++){const d=dist(poly[i],O);if(d<best){best=d;oi=i}}
-  const V=poly[oi],neighbors=[poly[(oi+5)%6],poly[(oi+1)%6]];
-  for(const E of neighbors){
-    ctx.save();ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
-    for(let s=1;s<=10;s++){
-      const f=(s-.5)/10,x=V.x+(E.x-V.x)*f,y=V.y+(E.y-V.y)*f;
-      const dx=E.x-V.x,dy=E.y-V.y,L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;
-      ctx.strokeStyle=s>=7&&s<=9?'rgba(109,40,217,.55)':'rgba(60,55,48,.18)';ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(x-nx*5,y-ny*5);ctx.lineTo(x+nx*5,y+ny*5);ctx.stroke();
-      if(s>=7&&s<=9){const val=s-6;ctx.fillStyle='#6d28d9';ctx.fillText(String(val),x+nx*14,y+ny*14)}
+    return {
+      slot: index,
+      cx: O.x + R * Math.cos(theta),
+      cy: O.y + R * Math.sin(theta),
+      base: angle + 180
+    };
+  });
+
+  const pieces = centerDirections.map((angle, index) => {
+    const geometry = slotGeom[index];
+
+    return {
+      cx: geometry.cx,
+      cy: geometry.cy,
+      base: geometry.base,
+      rotation: 0,
+      index,
+      slot: index
+    };
+  });
+
+  /*
+    Cada arista está dividida en 10 segmentos.
+
+    Segmentos 1–6: vacíos.
+    Segmento 7: valor 1.
+    Segmento 8: valor 2.
+    Segmento 9: valor 3.
+    Segmento 10: vacío.
+
+    Se usa el centro de cada segmento:
+    segmento 7 → 65 %
+    segmento 8 → 75 %
+    segmento 9 → 85 %
+  */
+
+  const POS = {
+    1: 0.65,
+    2: 0.75,
+    3: 0.85
+  };
+
+  const sharedRays = [-30, 90, 210];
+
+  const sharedValues = [2, 3, 1];
+
+  function pointOnRay(angleDegrees, value) {
+    const distance = R * POS[value];
+    const angle = rad(angleDegrees);
+
+    return {
+      x: O.x + distance * Math.cos(angle),
+      y: O.y + distance * Math.sin(angle)
+    };
+  }
+
+  function circleThrough3(a, b, c) {
+    const denominator =
+      2 * (
+        a.x * (b.y - c.y) +
+        b.x * (c.y - a.y) +
+        c.x * (a.y - b.y)
+      );
+
+    const aa = a.x * a.x + a.y * a.y;
+    const bb = b.x * b.x + b.y * b.y;
+    const cc = c.x * c.x + c.y * c.y;
+
+    const x =
+      (
+        aa * (b.y - c.y) +
+        bb * (c.y - a.y) +
+        cc * (a.y - b.y)
+      ) / denominator;
+
+    const y =
+      (
+        aa * (c.x - b.x) +
+        bb * (a.x - c.x) +
+        cc * (b.x - a.x)
+      ) / denominator;
+
+    return {
+      x,
+      y,
+      r: dist({ x, y }, a)
+    };
+  }
+
+  function reflectAcrossRay(point, origin, angleDegrees) {
+    const relative = rotPoint({
+      x: point.x - origin.x,
+      y: point.y - origin.y
+    }, -angleDegrees);
+
+    const reflected = {
+      x: relative.x,
+      y: -relative.y
+    };
+
+    const world = rotPoint(reflected, angleDegrees);
+
+    return {
+      x: origin.x + world.x,
+      y: origin.y + world.y
+    };
+  }
+
+  function vertices(piece) {
+    const points = [];
+    const start = rad(piece.base + piece.rotation);
+
+    for (let i = 0; i < 6; i++) {
+      const angle = start + i * Math.PI / 3;
+
+      points.push({
+        x: piece.cx + R * Math.cos(angle),
+        y: piece.cy + R * Math.sin(angle)
+      });
     }
+
+    return points;
+  }
+
+  function pathPoly(points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+
+    ctx.closePath();
+  }
+
+  function worldFromLocal(piece, point) {
+    const rotated = rotPoint(
+      point,
+      piece.base + piece.rotation
+    );
+
+    return {
+      x: piece.cx + rotated.x,
+      y: piece.cy + rotated.y
+    };
+  }
+
+  function localFromWorld(piece, point, activeRotation) {
+    return rotPoint({
+      x: point.x - piece.cx,
+      y: point.y - piece.cy
+    }, -(piece.base + activeRotation));
+  }
+
+  function inside(point, polygon) {
+    let contained = false;
+
+    for (
+      let i = 0, j = polygon.length - 1;
+      i < polygon.length;
+      j = i++
+    ) {
+      const a = polygon[i];
+      const b = polygon[j];
+
+      const intersects =
+        ((a.y > point.y) !== (b.y > point.y)) &&
+        (
+          point.x <
+          (b.x - a.x) *
+          (point.y - a.y) /
+          (b.y - a.y) +
+          a.x
+        );
+
+      if (intersects) {
+        contained = !contained;
+      }
+    }
+
+    return contained;
+  }
+
+  /*
+    Una única circunferencia ganadora pasa por
+    los tres puntos centrales correspondientes.
+  */
+
+  const winPts = sharedRays.map((angle, index) => {
+    return pointOnRay(angle, sharedValues[index]);
+  });
+
+  const solutionCircle = circleThrough3(
+    winPts[0],
+    winPts[1],
+    winPts[2]
+  );
+
+  const pieceEdges = [
+    [-30, 210],
+    [-30, 90],
+    [90, 210]
+  ];
+
+  const winnerPairs = [
+    [2, 1],
+    [2, 3],
+    [3, 1]
+  ];
+
+  const concentricValues = [1, 2, 3];
+
+  /*
+    Cada pieza contiene:
+
+    1. Un arco ganador.
+    2. Un arco equivalente reflejado.
+    3. Un arco concéntrico.
+  */
+
+  const curveDefs = pieces.map((piece, index) => {
+    const edges = pieceEdges[index];
+
+    const winner = {
+      type: "ganadora",
+      activeRotation: 0,
+      circle: solutionCircle,
+      endpoints: [
+        pointOnRay(edges[0], winnerPairs[index][0]),
+        pointOnRay(edges[1], winnerPairs[index][1])
+      ]
+    };
+
+    let bisector;
+
+    if (index === 0) {
+      bisector = -90;
+    } else if (index === 1) {
+      bisector = 30;
+    } else {
+      bisector = 150;
+    }
+
+    const mirroredCenter = reflectAcrossRay(
+      solutionCircle,
+      O,
+      bisector
+    );
+
+    const mirror = {
+      type: "equivalente",
+      activeRotation: 240,
+      circle: {
+        x: mirroredCenter.x,
+        y: mirroredCenter.y,
+        r: solutionCircle.r
+      },
+      endpoints: [
+        pointOnRay(edges[0], winnerPairs[index][1]),
+        pointOnRay(edges[1], winnerPairs[index][0])
+      ]
+    };
+
+    const value = concentricValues[index];
+
+    const concentric = {
+      type: "concéntrica",
+      activeRotation: 120,
+      circle: {
+        x: O.x,
+        y: O.y,
+        r: R * POS[value]
+      },
+      endpoints: [
+        pointOnRay(edges[0], value),
+        pointOnRay(edges[1], value)
+      ]
+    };
+
+    return [
+      winner,
+      mirror,
+      concentric
+    ];
+  });
+
+  /*
+    Se convierten los arcos a coordenadas locales
+    para que acompañen correctamente a cada pieza.
+  */
+
+  for (const piece of pieces) {
+    for (const definition of curveDefs[piece.index]) {
+      definition.localCenter = localFromWorld(
+        piece,
+        definition.circle,
+        definition.activeRotation
+      );
+
+      definition.localEnds = definition.endpoints.map(endpoint => {
+        return localFromWorld(
+          piece,
+          endpoint,
+          definition.activeRotation
+        );
+      });
+
+      const circle = definition.circle;
+      const start = definition.endpoints[0];
+      const end = definition.endpoints[1];
+
+      definition.a0 = Math.atan2(
+        start.y - circle.y,
+        start.x - circle.x
+      );
+
+      definition.a1 = Math.atan2(
+        end.y - circle.y,
+        end.x - circle.x
+      );
+
+      const polygon = vertices({
+        ...piece,
+        rotation: definition.activeRotation
+      });
+
+      const clockwiseMid =
+        definition.a0 +
+        (
+          (
+            definition.a1 -
+            definition.a0 +
+            Math.PI * 2
+          ) %
+          (Math.PI * 2)
+        ) / 2;
+
+      const counterClockwiseMid =
+        definition.a0 -
+        (
+          (
+            definition.a0 -
+            definition.a1 +
+            Math.PI * 2
+          ) %
+          (Math.PI * 2)
+        ) / 2;
+
+      const midpoint1 = {
+        x: circle.x + circle.r * Math.cos(clockwiseMid),
+        y: circle.y + circle.r * Math.sin(clockwiseMid)
+      };
+
+      const midpoint2 = {
+        x: circle.x + circle.r * Math.cos(counterClockwiseMid),
+        y: circle.y + circle.r * Math.sin(counterClockwiseMid)
+      };
+
+      definition.ccw =
+        inside(midpoint2, polygon) &&
+        !inside(midpoint1, polygon);
+    }
+  }
+
+  function activeSlot(piece) {
+    if (piece.rotation === 0) {
+      return 0;
+    }
+
+    if (piece.rotation === 120) {
+      return 2;
+    }
+
+    return 1;
+  }
+
+  function curveWorld(piece, slot) {
+    const definition = curveDefs[piece.index][slot];
+
+    const center = worldFromLocal(
+      piece,
+      definition.localCenter
+    );
+
+    const endpoints = definition.localEnds.map(endpoint => {
+      return worldFromLocal(piece, endpoint);
+    });
+
+    const angleOffset =
+      rad(piece.base + piece.rotation) -
+      rad(piece.base + definition.activeRotation);
+
+    return {
+      data: definition,
+      circle: {
+        x: center.x,
+        y: center.y,
+        r: definition.circle.r
+      },
+      ends: endpoints,
+      a0: definition.a0 + angleOffset,
+      a1: definition.a1 + angleOffset,
+      ccw: definition.ccw
+    };
+  }
+
+  function drawArc(piece, slot) {
+    const polygon = vertices(piece);
+    const curve = curveWorld(piece, slot);
+
+    ctx.save();
+
+    pathPoly(polygon);
+    ctx.clip();
+
+    ctx.beginPath();
+
+    ctx.arc(
+      curve.circle.x,
+      curve.circle.y,
+      curve.circle.r,
+      curve.a0,
+      curve.a1,
+      curve.ccw
+    );
+
+    ctx.strokeStyle = "#242422";
+    ctx.lineWidth = LINE;
+    ctx.lineCap = "butt";
+    ctx.stroke();
+
     ctx.restore();
   }
-}
 
-function drawPiece(p){
-  const poly=vertices(p);
-  ctx.save();pathPoly(poly);ctx.fillStyle=fills[p.index];ctx.fill();ctx.strokeStyle='#242422';ctx.lineWidth=3;ctx.stroke();ctx.restore();
-  for(let slot=0;slot<3;slot++)drawArc(p,slot);
-  if(state.selected===p.index){
-    ctx.save();pathPoly(poly);ctx.strokeStyle='#6d28d9';ctx.lineWidth=8;ctx.setLineDash([18,10]);ctx.stroke();ctx.restore();
-  }
-}
+  function drawPiece(piece) {
+    const polygon = vertices(piece);
 
-function endpointOnSharedRay(curve,angle){
-  const a=rad(angle),ux=Math.cos(a),uy=Math.sin(a);let best=null;
-  for(const e of curve.ends){
-    const vx=e.x-O.x,vy=e.y-O.y,t=vx*ux+vy*uy,off=Math.abs(vx*uy-vy*ux);
-    if(t>=0&&off<4&&(best===null||off<best.off))best={t,off};
+    ctx.save();
+
+    pathPoly(polygon);
+    ctx.fillStyle = fills[piece.index];
+    ctx.fill();
+
+    ctx.restore();
+
+    for (let slot = 0; slot < 3; slot++) {
+      drawArc(piece, slot);
+    }
+
+    ctx.save();
+
+    pathPoly(polygon);
+    ctx.strokeStyle = "#242422";
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    ctx.restore();
+
+    /*
+      La selección no mueve, escala ni desplaza la pieza.
+      Solo se muestra un borde suave.
+    */
+
+    if (state.selected === piece.index) {
+      ctx.save();
+
+      pathPoly(polygon);
+
+      ctx.strokeStyle = "rgba(109,40,217,.72)";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.shadowColor = "rgba(109,40,217,.32)";
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+
+      ctx.restore();
+    }
   }
-  return best?best.t:null;
-}
-function edgeMatches(){
-  const bySlot=[...pieces].sort((a,b)=>a.slot-b.slot);
-  const curves=bySlot.map((p)=>curveWorld(p,activeSlot(p)));
-  const pairs=[[0,1],[1,2],[2,0]];
-  return pairs.map((pair,i)=>{
-    const a=endpointOnSharedRay(curves[pair[0]],sharedRays[i]);
-    const b=endpointOnSharedRay(curves[pair[1]],sharedRays[i]);
-    const diff=(a==null||b==null)?Infinity:Math.abs(a-b);
-    const steps=Number.isFinite(diff)?Math.round(diff/(R/10)):99;
-    return{pair,angle:sharedRays[i],a,b,diff,steps,ok:diff<1.5,near:diff<LINE*1.25};
+
+  function endpointOnSharedRay(curve, angleDegrees) {
+    const angle = rad(angleDegrees);
+
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+
+    let best = null;
+
+    for (const endpoint of curve.ends) {
+      const vx = endpoint.x - O.x;
+      const vy = endpoint.y - O.y;
+
+      const projection = vx * ux + vy * uy;
+      const offset = Math.abs(vx * uy - vy * ux);
+
+      if (
+        projection >= 0 &&
+        offset < 4 &&
+        (
+          best === null ||
+          offset < best.offset
+        )
+      ) {
+        best = {
+          t: projection,
+          offset
+        };
+      }
+    }
+
+    return best ? best.t : null;
+  }
+
+  function edgeMatches() {
+    const ordered = [...pieces].sort(
+      (a, b) => a.slot - b.slot
+    );
+
+    const curves = ordered.map(piece => {
+      return curveWorld(
+        piece,
+        activeSlot(piece)
+      );
+    });
+
+    const pairs = [
+      [0, 1],
+      [1, 2],
+      [2, 0]
+    ];
+
+    return pairs.map((pair, index) => {
+      const first = endpointOnSharedRay(
+        curves[pair[0]],
+        sharedRays[index]
+      );
+
+      const second = endpointOnSharedRay(
+        curves[pair[1]],
+        sharedRays[index]
+      );
+
+      const difference =
+        first === null || second === null
+          ? Infinity
+          : Math.abs(first - second);
+
+      return {
+        ok: difference < 1.5
+      };
+    });
+  }
+
+  function solved() {
+    return edgeMatches().every(result => result.ok);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.fillStyle = "#eee8dc";
+    ctx.fillRect(0, 0, W, H);
+
+    [...pieces]
+      .sort((a, b) => a.slot - b.slot)
+      .forEach(drawPiece);
+
+    const status = document.getElementById("status");
+
+    if (solved()) {
+      status.innerHTML =
+        "<strong>¡Resuelto!</strong> " +
+        "Has cerrado la circunferencia en " +
+        state.moves +
+        " movimientos.";
+    } else if (state.selected === null) {
+      status.textContent =
+        "Movimientos: " +
+        state.moves +
+        ". Selecciona una pieza con clic o Tab.";
+    } else {
+      status.textContent =
+        "Movimientos: " +
+        state.moves +
+        ". Gira con ←/→ o pulsa otra pieza para intercambiarlas.";
+    }
+  }
+
+  function pointer(event) {
+    const rect = canvas.getBoundingClientRect();
+
+    return {
+      x:
+        (event.clientX - rect.left) *
+        W /
+        rect.width,
+
+      y:
+        (event.clientY - rect.top) *
+        H /
+        rect.height
+    };
+  }
+
+  function selectedPiece() {
+    return pieces.find(piece => {
+      return piece.index === state.selected;
+    }) || null;
+  }
+
+  function selectPiece(piece) {
+    if (state.selected === null) {
+      state.selected = piece.index;
+      draw();
+      return;
+    }
+
+    const current = selectedPiece();
+
+    if (current.index === piece.index) {
+      draw();
+      return;
+    }
+
+    const temporary = {
+      cx: current.cx,
+      cy: current.cy,
+      base: current.base,
+      slot: current.slot
+    };
+
+    current.cx = piece.cx;
+    current.cy = piece.cy;
+    current.base = piece.base;
+    current.slot = piece.slot;
+
+    piece.cx = temporary.cx;
+    piece.cy = temporary.cy;
+    piece.base = temporary.base;
+    piece.slot = temporary.slot;
+
+    state.selected = piece.index;
+    state.moves++;
+
+    draw();
+  }
+
+  function rotateSelected(direction) {
+    const piece = selectedPiece();
+
+    if (!piece) {
+      return;
+    }
+
+    piece.rotation =
+      (
+        piece.rotation +
+        (
+          direction > 0
+            ? 120
+            : 240
+        )
+      ) % 360;
+
+    state.moves++;
+
+    draw();
+  }
+
+  function scramble() {
+    const permutation = [2, 0, 1];
+    const rotations = [120, 240, 120];
+
+    pieces.forEach((piece, index) => {
+      const geometry = slotGeom[permutation[index]];
+
+      piece.cx = geometry.cx;
+      piece.cy = geometry.cy;
+      piece.base = geometry.base;
+      piece.slot = geometry.slot;
+      piece.rotation = rotations[index];
+    });
+
+    if (solved()) {
+      pieces[0].rotation =
+        (pieces[0].rotation + 120) % 360;
+    }
+
+    state.selected = null;
+    state.moves = 0;
+
+    draw();
+  }
+
+  function randomMix() {
+    const slots = [0, 1, 2]
+      .sort(() => Math.random() - 0.5);
+
+    pieces.forEach((piece, index) => {
+      const geometry = slotGeom[slots[index]];
+
+      piece.cx = geometry.cx;
+      piece.cy = geometry.cy;
+      piece.base = geometry.base;
+      piece.slot = geometry.slot;
+
+      piece.rotation =
+        120 * Math.floor(Math.random() * 3);
+    });
+
+    if (solved()) {
+      pieces[0].rotation =
+        (pieces[0].rotation + 120) % 360;
+    }
+
+    state.selected = null;
+    state.moves = 0;
+
+    draw();
+    canvas.focus();
+  }
+
+  canvas.addEventListener("pointerdown", event => {
+    const point = pointer(event);
+
+    const piece = [...pieces]
+      .reverse()
+      .find(candidate => {
+        return inside(
+          point,
+          vertices(candidate)
+        );
+      });
+
+    if (piece) {
+      selectPiece(piece);
+    }
+
+    canvas.focus();
   });
-}
-function solved(){return edgeMatches().every(e=>e.ok)}
-function draw(){
-  ctx.clearRect(0,0,W,H);ctx.fillStyle='#eee8dc';ctx.fillRect(0,0,W,H);
-  [...pieces].sort((a,b)=>a.slot-b.slot).forEach(drawPiece);
-  const status=document.getElementById('status');
-  if(solved()){
-    status.innerHTML=`<strong>¡Resuelto!</strong> Has cerrado la circunferencia en ${state.moves} movimientos.`;
-  }else if(state.selected===null){
-    status.textContent=`Movimientos: ${state.moves}. Selecciona una pieza con clic o Tab.`;
-  }else{
-    status.textContent=`Movimientos: ${state.moves}. Pieza seleccionada: gira con ←/→ o haz clic en otra para intercambiarlas.`;
-  }
-}
 
-function pointer(ev){const r=canvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*W/r.width,y:(ev.clientY-r.top)*H/r.height}}
-function selectedPiece(){return pieces.find(p=>p.index===state.selected)||null}
-function selectPiece(p){
-  if(state.selected===null){state.selected=p.index;draw();return;}
-  const current=selectedPiece();
-  if(current.index===p.index){draw();return;}
-  const a={cx:current.cx,cy:current.cy,base:current.base,slot:current.slot};
-  current.cx=p.cx;current.cy=p.cy;current.base=p.base;current.slot=p.slot;
-  p.cx=a.cx;p.cy=a.cy;p.base=a.base;p.slot=a.slot;
-  state.selected=p.index;state.moves++;draw();
-}
-function rotateSelected(dir){
-  const p=selectedPiece();if(!p)return;
-  p.rotation=(p.rotation+(dir>0?120:240))%360;state.moves++;draw();
-}
-function scramble(){
-  const perm=[2,0,1],rots=[120,240,120];
-  pieces.forEach((p,i)=>{const g=slotGeom[perm[i]];p.cx=g.cx;p.cy=g.cy;p.base=g.base;p.slot=g.slot;p.rotation=rots[i];});
-  if(solved())pieces[0].rotation=(pieces[0].rotation+120)%360;
-  state.selected=null;state.moves=0;draw();
-}
-canvas.addEventListener('pointerdown',e=>{const q=pointer(e),p=[...pieces].reverse().find(x=>inside(q,vertices(x)));if(p)selectPiece(p);canvas.focus();});
-canvas.addEventListener('keydown',e=>{
-  if(e.key==='Tab'){
-    e.preventDefault();
-    const order=[...pieces].sort((a,b)=>a.slot-b.slot);
-    const idx=state.selected===null?-1:order.findIndex(p=>p.index===state.selected);
-    state.selected=order[(idx+(e.shiftKey?-1:1)+order.length)%order.length].index;draw();
-  }else if(e.key==='ArrowLeft'){e.preventDefault();rotateSelected(-1)}
-  else if(e.key==='ArrowRight'){e.preventDefault();rotateSelected(1)}
-  else if(e.key==='Enter'||e.key===' '){e.preventDefault();rotateSelected(1)}
-});
-document.getElementById('left').addEventListener('click',()=>rotateSelected(-1));
-document.getElementById('right').addEventListener('click',()=>rotateSelected(1));
-document.getElementById('mix').addEventListener('click',()=>{
-  const slots=[0,1,2].sort(()=>Math.random()-.5);
-  pieces.forEach((p,i)=>{const g=slotGeom[slots[i]];p.cx=g.cx;p.cy=g.cy;p.base=g.base;p.slot=g.slot;p.rotation=120*Math.floor(Math.random()*3);});
-  if(solved())pieces[0].rotation=(pieces[0].rotation+120)%360;
-  state.selected=null;state.moves=0;draw();canvas.focus();
-});
-scramble();
-draw();
+  canvas.addEventListener("keydown", event => {
+    if (event.key === "Tab") {
+      event.preventDefault();
+
+      const ordered = [...pieces].sort(
+        (a, b) => a.slot - b.slot
+      );
+
+      const currentIndex =
+        state.selected === null
+          ? -1
+          : ordered.findIndex(piece => {
+              return piece.index === state.selected;
+            });
+
+      const direction =
+        event.shiftKey
+          ? -1
+          : 1;
+
+      const nextIndex =
+        (
+          currentIndex +
+          direction +
+          ordered.length
+        ) % ordered.length;
+
+      state.selected =
+        ordered[nextIndex].index;
+
+      draw();
+
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      rotateSelected(-1);
+
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      rotateSelected(1);
+
+    } else if (
+      event.key === "Enter" ||
+      event.key === " "
+    ) {
+      event.preventDefault();
+      rotateSelected(1);
+    }
+  });
+
+  document
+    .getElementById("left")
+    .addEventListener("click", () => {
+      rotateSelected(-1);
+    });
+
+  document
+    .getElementById("right")
+    .addEventListener("click", () => {
+      rotateSelected(1);
+    });
+
+  document
+    .getElementById("mix")
+    .addEventListener("click", randomMix);
+
+  scramble();
 })();
 </script>
+
 </body>
 </html>
