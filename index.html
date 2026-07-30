@@ -6,13 +6,13 @@
 <title>Puzle de tres hexágonos</title>
 <style>
 :root{--bg:#f1eee7;--panel:#fffdf8;--ink:#1d1d1b;--muted:#777168;--border:#d3ccbf;--accent:#6d28d9;--good:#0f766e;--near:#b45309;--piece1:#fff9ed;--piece2:#f7fbff;--piece3:#fff8f4}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:20px}h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2.25rem)}p{line-height:1.45}.sub{margin:0 0 16px;color:var(--muted)}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}button,label{border:1px solid var(--border);border-radius:999px;background:var(--panel);padding:9px 14px;font:inherit;cursor:pointer}button.primary{background:var(--ink);color:white;border-color:var(--ink)}label{display:flex;align-items:center;gap:7px}.stage{background:var(--panel);border:1px solid var(--border);border-radius:24px;overflow:hidden}canvas{display:block;width:100%;height:auto;touch-action:manipulation}.info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}.small{font-size:.9rem;color:var(--muted);margin-top:4px}.status{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}@media(max-width:720px){main{padding:10px}.info{grid-template-columns:1fr}button,label{font-size:.92rem;padding:8px 11px}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:20px}h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2.25rem)}p{line-height:1.45}.sub{margin:0 0 16px;color:var(--muted)}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}button,label{border:1px solid var(--border);border-radius:999px;background:var(--panel);padding:9px 14px;font:inherit;cursor:pointer}button.primary{background:var(--ink);color:white;border-color:var(--ink)}label{display:flex;align-items:center;gap:7px}.stage{background:var(--panel);border:1px solid var(--border);border-radius:24px;overflow:hidden}canvas{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}.info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}.small{font-size:.9rem;color:var(--muted);margin-top:4px}.status{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}@media(max-width:720px){main{padding:10px}.info{grid-template-columns:1fr}button,label{font-size:.92rem;padding:8px 11px}}
 </style>
 </head>
 <body>
 <main>
 <h1>Circunferencia entre tres hexágonos</h1>
-<p class="sub">Selecciona un hexágono. Usa los botones para girarlo o selecciona otro hexágono para intercambiar sus posiciones.</p>
+<p class="sub">Arrastra una pieza con un dedo. Usa dos dedos para girarla. Al soltar, encajará en el hueco más cercano; también puedes usar los botones y el teclado.</p>
 <div class="toolbar">
   <button id="left">↺ Girar izquierda</button>
   <button id="right">Girar derecha ↻</button>
@@ -36,6 +36,7 @@ const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
 const W=canvas.width,H=canvas.height,O={x:500,y:390},R=205;
 const LINE=R/10; // grosor = un décimo exacto de la arista
 const state={guides:false,classify:false,selected:null,moves:0};
+const gesture={piece:null,pointers:new Map(),cx:0,cy:0,rotation:0,originSlot:null,dragOffset:{x:0,y:0},mode:'none',startMid:null,startAngle:0,startCenter:null,startRotation:0,moved:false};
 const fills=['#fff9ed','#f7fbff','#fff8f4'];
 const centerDirections=[-90,30,150];
 const slots=centerDirections.map((a,i)=>{const t=rad(a);return Object.freeze({slot:i,cx:O.x+R*Math.cos(t),cy:O.y+R*Math.sin(t),base:a+180});});
@@ -64,8 +65,12 @@ function reflectAcrossRay(pt,origin,angleDeg){
   const w=rotPoint({x:q.x,y:-q.y},angleDeg);
   return{x:origin.x+w.x,y:origin.y+w.y};
 }
-function pieceCenter(p){return slots[p.slot]}
-function vertices(p){const {cx,cy}=pieceCenter(p),pts=[],start=rad(HEX_BASE+p.rotation);for(let i=0;i<6;i++){const a=start+i*Math.PI/3;pts.push({x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)});}return pts}
+function pieceCenter(p,visual=true){
+  if(visual&&gesture.piece===p)return{cx:gesture.cx,cy:gesture.cy};
+  return slots[p.slot];
+}
+function pieceRotation(p,visual=true){return visual&&gesture.piece===p?gesture.rotation:p.rotation}
+function vertices(p,visual=true){const {cx,cy}=pieceCenter(p,visual),pts=[],start=rad(HEX_BASE+pieceRotation(p,visual));for(let i=0;i<6;i++){const a=start+i*Math.PI/3;pts.push({x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)});}return pts}
 function pathPoly(pts){ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath()}
 function inside(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a.y>pt.y)!=(b.y>pt.y))&&(pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x))c=!c;}return c}
 
@@ -121,12 +126,12 @@ for(const p of pieces){
 }
 
 function activeSlot(p){return p.rotation===0?0:p.rotation===120?2:1}
-function curveWorld(p,slot){
-  const d=curveDefs[p.index][slot],{cx,cy}=pieceCenter(p);
-  const lc=rotPoint(d.localCenter,p.rotation);
+function curveWorld(p,slot,visual=true){
+  const d=curveDefs[p.index][slot],{cx,cy}=pieceCenter(p,visual),rotation=pieceRotation(p,visual);
+  const lc=rotPoint(d.localCenter,rotation);
   const c={x:cx+lc.x,y:cy+lc.y};
-  const ends=d.localEnds.map(e=>{const q=rotPoint(e,p.rotation);return{x:cx+q.x,y:cy+q.y}});
-  const rot=rad(p.rotation);
+  const ends=d.localEnds.map(e=>{const q=rotPoint(e,rotation);return{x:cx+q.x,y:cy+q.y}});
+  const rot=rad(rotation);
   return{data:d,circle:{x:c.x,y:c.y,r:d.circle.r},ends,a0:d.localA0+rot,a1:d.localA1+rot,ccw:d.ccw};
 }
 
@@ -189,7 +194,7 @@ function endpointOnSharedRay(curve,angle){
   return best?best.t:null;
 }
 function edgeMatches(){
-  const ordered=[...pieces].sort((a,b)=>a.slot-b.slot); const curves=ordered.map((p)=>curveWorld(p,activeSlot(p)));
+  const ordered=[...pieces].sort((a,b)=>a.slot-b.slot); const curves=ordered.map((p)=>curveWorld(p,activeSlot(p),false));
   const pairs=[[0,1],[1,2],[2,0]];
   return pairs.map((pair,i)=>{
     const a=endpointOnSharedRay(curves[pair[0]],sharedRays[i]);
@@ -210,7 +215,9 @@ function draw(){
   ctx.clearRect(0,0,W,H);ctx.fillStyle='#eee8dc';ctx.fillRect(0,0,W,H);
   const matches=edgeMatches();
   if(state.guides){ctx.save();for(const a of sharedRays){const t=rad(a);ctx.beginPath();ctx.moveTo(O.x,O.y);ctx.lineTo(O.x+R*Math.cos(t),O.y+R*Math.sin(t));ctx.strokeStyle='rgba(31,41,55,.20)';ctx.lineWidth=1.5;ctx.setLineDash([5,7]);ctx.stroke();}ctx.restore();}
-  [...pieces].sort((a,b)=>a.slot-b.slot).forEach(drawPiece);
+  const ordered=[...pieces].sort((a,b)=>a.slot-b.slot);
+  ordered.filter(p=>p!==gesture.piece).forEach(drawPiece);
+  if(gesture.piece)drawPiece(gesture.piece);
   ctx.save();ctx.beginPath();ctx.arc(O.x,O.y,7,0,Math.PI*2);ctx.fillStyle=solved()?'#0f766e':'#6d28d9';ctx.fill();ctx.fillStyle='#222';ctx.font='600 15px system-ui';ctx.fillText('O',O.x+12,O.y+20);ctx.restore();
   const active=pieces.map(p=>curveDefs[p.index][activeSlot(p)].pair).join(' + ');
   const exact=matches.filter(e=>e.ok).length,one=matches.filter(e=>e.steps===1).length,two=matches.filter(e=>e.steps===2).length;
@@ -236,12 +243,76 @@ function selectOrSwap(p){
   [first.slot,p.slot]=[p.slot,first.slot];
   state.selected=null;state.moves++;draw();
 }
+function midpoint(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+function angleBetween(a,b){return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI}
+function normalizeAngle(a){return((a%360)+360)%360}
+function nearestSlot(x,y){
+  let best=0,bestD=Infinity;
+  for(const s of slots){const d=Math.hypot(x-s.cx,y-s.cy);if(d<bestD){bestD=d;best=s.slot}}
+  return best;
+}
+function beginTwoFinger(){
+  const pts=[...gesture.pointers.values()];if(pts.length<2)return;
+  gesture.mode='rotate';gesture.startMid=midpoint(pts[0],pts[1]);gesture.startAngle=angleBetween(pts[0],pts[1]);
+  gesture.startCenter={x:gesture.cx,y:gesture.cy};gesture.startRotation=gesture.rotation;
+}
+function updateGesture(){
+  const pts=[...gesture.pointers.values()];if(!gesture.piece||!pts.length)return;
+  if(pts.length===1){
+    if(gesture.mode!=='drag'){gesture.mode='drag';gesture.dragOffset={x:pts[0].x-gesture.cx,y:pts[0].y-gesture.cy}}
+    gesture.cx=pts[0].x-gesture.dragOffset.x;gesture.cy=pts[0].y-gesture.dragOffset.y;
+  }else{
+    if(gesture.mode!=='rotate')beginTwoFinger();
+    const mid=midpoint(pts[0],pts[1]),a=angleBetween(pts[0],pts[1]);
+    gesture.cx=gesture.startCenter.x+(mid.x-gesture.startMid.x);
+    gesture.cy=gesture.startCenter.y+(mid.y-gesture.startMid.y);
+    gesture.rotation=gesture.startRotation+(a-gesture.startAngle);
+  }
+  gesture.moved=true;draw();
+}
+function finishGesture(){
+  const p=gesture.piece;if(!p)return;
+  const target=nearestSlot(gesture.cx,gesture.cy);
+  const snapped=normalizeAngle(Math.round(gesture.rotation/120)*120)%360;
+  const other=pieces.find(x=>x!==p&&x.slot===target);
+  const changed=target!==gesture.originSlot||snapped!==p.rotation||gesture.moved;
+  if(other&&target!==gesture.originSlot)other.slot=gesture.originSlot;
+  p.slot=target;p.rotation=snapped;
+  if(changed)state.moves++;
+  state.selected=null;
+  gesture.piece=null;gesture.pointers.clear();gesture.mode='none';gesture.moved=false;
+  draw();
+}
 canvas.addEventListener('pointerdown',e=>{
   const q=pointer(e);
-  const p=[...pieces].sort((a,b)=>b.slot-a.slot).find(x=>inside(q,vertices(x)));
-  if(p)selectOrSwap(p);
-  canvas.focus();
+  if(!gesture.piece){
+    const p=[...pieces].reverse().find(x=>inside(q,vertices(x)));
+    if(!p)return;
+    const c=pieceCenter(p,false);
+    gesture.piece=p;gesture.cx=c.cx;gesture.cy=c.cy;gesture.rotation=p.rotation;gesture.originSlot=p.slot;
+    gesture.dragOffset={x:q.x-c.cx,y:q.y-c.cy};gesture.mode='drag';gesture.moved=false;
+    state.selected=p.index;
+  }
+  gesture.pointers.set(e.pointerId,q);
+  canvas.setPointerCapture(e.pointerId);
+  if(gesture.pointers.size>=2)beginTwoFinger();
+  draw();canvas.focus();e.preventDefault();
 });
+canvas.addEventListener('pointermove',e=>{
+  if(!gesture.pointers.has(e.pointerId))return;
+  gesture.pointers.set(e.pointerId,pointer(e));updateGesture();e.preventDefault();
+});
+function endPointer(e){
+  if(!gesture.pointers.has(e.pointerId))return;
+  gesture.pointers.delete(e.pointerId);
+  if(gesture.pointers.size===0)finishGesture();
+  else if(gesture.pointers.size===1){
+    const pt=[...gesture.pointers.values()][0];gesture.mode='drag';gesture.dragOffset={x:pt.x-gesture.cx,y:pt.y-gesture.cy};draw();
+  }else beginTwoFinger();
+  e.preventDefault();
+}
+canvas.addEventListener('pointerup',endPointer);
+canvas.addEventListener('pointercancel',endPointer);
 canvas.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'){e.preventDefault();rotateSelected(-1)}
   else if(e.key==='ArrowRight'){e.preventDefault();rotateSelected(1)}
@@ -263,7 +334,9 @@ function shuffle(array){
   }
   return array;
 }
+function cancelGesture(){gesture.piece=null;gesture.pointers.clear();gesture.mode='none';gesture.moved=false}
 function scramble(){
+  cancelGesture();
   do{
     const slots=shuffle([0,1,2]);
     pieces.forEach((p,i)=>{
@@ -275,11 +348,11 @@ function scramble(){
 }
 document.getElementById('mix').addEventListener('click',scramble);
 document.getElementById('solve').addEventListener('click',()=>{
-  pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
+  cancelGesture();pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
   state.selected=null;state.moves=0;draw();
 });
 document.getElementById('reset').addEventListener('click',()=>{
-  pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
+  cancelGesture();pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
   state.guides=false;state.classify=false;state.selected=null;state.moves=0;
   document.getElementById('guides').checked=false;document.getElementById('classify').checked=false;draw();
 });
