@@ -1,25 +1,292 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Porra Equipo A</title>
-  <meta name="description" content="Crea tu porra privada, invita amigos y compite prediciendo resultados." />
-  <link rel="stylesheet" href="./styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Puzle de tres hexágonos</title>
+<style>
+:root{--bg:#f1eee7;--panel:#fffdf8;--ink:#1d1d1b;--muted:#777168;--border:#d3ccbf;--accent:#6d28d9;--good:#0f766e;--near:#b45309;--piece1:#fff9ed;--piece2:#f7fbff;--piece3:#fff8f4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1050px;margin:auto;padding:20px}h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2.25rem)}p{line-height:1.45}.sub{margin:0 0 16px;color:var(--muted)}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}button,label{border:1px solid var(--border);border-radius:999px;background:var(--panel);padding:9px 14px;font:inherit;cursor:pointer}button.primary{background:var(--ink);color:white;border-color:var(--ink)}label{display:flex;align-items:center;gap:7px}.stage{background:var(--panel);border:1px solid var(--border);border-radius:24px;overflow:hidden}canvas{display:block;width:100%;height:auto;touch-action:manipulation}.info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}.small{font-size:.9rem;color:var(--muted);margin-top:4px}.status{margin-top:10px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:12px 14px}@media(max-width:720px){main{padding:10px}.info{grid-template-columns:1fr}button,label{font-size:.92rem;padding:8px 11px}}
+</style>
 </head>
 <body>
-  <div class="noise"></div>
-  <header class="topbar"><div class="brand"><div class="brand-mark">A</div><div><div class="brand-title">Porra Equipo A</div><div class="brand-subtitle">Plan perfecto. Resultado imposible.</div></div></div><button id="soundBtn" class="ghost-btn" type="button">🔊 Activar modo misión</button></header>
-  <main class="shell">
-    <section id="landingView" class="hero view"><div class="hero-card"><div class="tag">NAOJAGUAR // PRIVATE POOLS</div><h1>Tu porra privada con estética de misión.</h1><p>Regístrate, crea una porra, invita con código y prepara tus predicciones. Las apuestas quedarán bloqueadas antes del inicio de la competición.</p><div class="hero-actions"><button id="showRegisterBtn" class="primary-btn" type="button">Crear cuenta</button><button id="showLoginBtn" class="secondary-btn" type="button">Iniciar sesión</button></div></div><div class="mission-panel"><div class="panel-title">REGLAS BASE</div><ul><li>Web pública, porras privadas.</li><li>Entrar con código solo después del login.</li><li>Resultado exacto: 3 puntos.</li><li>Signo acertado: 1 punto.</li><li>Pichichi: +1 por gol y +5 si acaba máximo goleador.</li></ul></div></section>
-    <section id="authView" class="view hidden"><div class="auth-grid"><form id="registerForm" class="card hidden"><div class="card-kicker">NUEVO RECLUTA</div><h2>Crear cuenta</h2><label>Email</label><input id="regEmail" type="email" required placeholder="tu@email.com" autocomplete="email" /><label>Nombre visible</label><input id="regDisplayName" type="text" required placeholder="Ej. Juan, Hannibal, M.A." autocomplete="name" /><p class="muted small-note">Este será tu nombre visible en todas tus porras privadas. No puede estar repetido.</p><label>Contraseña</label><input id="regPassword" type="password" required minlength="6" placeholder="mínimo 6 caracteres" autocomplete="new-password" /><button class="primary-btn full" type="submit">Registrarme</button><button id="goLoginBtn" class="link-btn" type="button">Ya tengo cuenta</button></form><form id="loginForm" class="card hidden"><div class="card-kicker">ACCESO A BASE</div><h2>Iniciar sesión</h2><label>Email</label><input id="loginEmail" type="email" required placeholder="tu@email.com" autocomplete="email" /><label>Contraseña</label><input id="loginPassword" type="password" required placeholder="••••••••" autocomplete="current-password" /><button class="primary-btn full" type="submit">Entrar</button><button id="goRegisterBtn" class="link-btn" type="button">Crear cuenta nueva</button></form></div></section>
-    <section id="dashboardView" class="view hidden"><div class="dashboard-head"><div><div class="tag">BASE DE OPERACIONES</div><h1>Mis porras</h1><p id="userLine" class="muted"></p></div><button id="logoutBtn" class="ghost-btn danger" type="button">Salir</button></div><div class="ops-grid"><form id="createPoolForm" class="card"><div class="card-kicker">CREAR MISIÓN</div><h2>Nueva porra privada</h2><label>Nombre de la porra</label><input id="poolName" type="text" required placeholder="Eurocopa Equipo A" /><label>Competición</label><select id="competitionSelect" required></select><button class="primary-btn full" type="submit">Crear porra</button></form><form id="joinPoolForm" class="card"><div class="card-kicker">ENTRAR CON CÓDIGO</div><h2>Unirse a una porra</h2><label>Código de invitación</label><input id="joinCode" type="text" required placeholder="ATEAM-ABC123" /><button class="secondary-btn full" type="submit">Entrar en porra</button></form></div><div class="card"><div class="card-kicker">PORRAS ACTIVAS</div><div id="poolsList" class="pool-list"></div></div></section>
-    <section id="poolView" class="view hidden"><button id="backDashboardBtn" class="ghost-btn" type="button">← Volver</button><div id="poolDetail" class="pool-detail"></div></section>
-    <section id="betView" class="view hidden"><button id="backPoolBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="betContent" class="pool-detail"></div></section>
-    <section id="myBetView" class="view hidden"><button id="backPoolFromMyBetBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="myBetContent" class="pool-detail"></div></section>
-    <section id="rankingView" class="view hidden"><button id="backPoolFromRankingBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="rankingContent" class="pool-detail"></div></section>
-    <section id="adminResultsView" class="view hidden"><button id="backPoolFromAdminBtn" class="ghost-btn" type="button">← Volver a la porra</button><div id="adminResultsContent" class="pool-detail"></div></section>
-    <div id="toast" class="toast hidden"></div>
-  </main>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./config.js"></script><script src="./app.js"></script>
-</body></html>
+<main>
+<h1>Circunferencia entre tres hexágonos</h1>
+<p class="sub">Selecciona un hexágono. Usa los botones para girarlo o selecciona otro hexágono para intercambiar sus posiciones.</p>
+<div class="toolbar">
+  <button id="left">↺ Girar izquierda</button>
+  <button id="right">Girar derecha ↻</button>
+  <button id="mix">Mezclar</button>
+  <button id="solve" class="primary">Ver solución</button>
+  <button id="reset">Reiniciar</button>
+  <label><input id="guides" type="checkbox"> Guías geométricas</label>
+  <label><input id="classify" type="checkbox"> Mostrar clasificación</label>
+</div>
+<div class="stage"><canvas id="board" width="1000" height="780" tabindex="0" aria-label="Tres hexágonos seleccionables, giratorios e intercambiables"></canvas></div>
+<div class="info">
+ <div class="card"><strong>Tres curvas por pieza</strong><div class="small">Cada una une las dos aristas contiguas a uno de los tres vértices alternos.</div></div>
+ <div class="card"><strong>Prueba en el centro</strong><div class="small">Al girar 120°, otro arco ocupa el vértice central y se enfrenta a los arcos de las otras dos piezas.</div></div>
+ <div class="card"><strong>Una combinación exacta</strong><div class="small">Las demás curvas también proceden de circunferencias: reflejos o rotaciones excéntricas y círculos concéntricos 1–1, 2–2 y 3–3. Solo una combinación coincide en las tres aristas.</div></div>
+</div>
+<div id="status" class="status"></div>
+</main>
+<script>
+(()=>{
+const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height,O={x:500,y:390},R=205;
+const LINE=R/10; // grosor = un décimo exacto de la arista
+const state={guides:false,classify:false,selected:null,moves:0};
+const fills=['#fff9ed','#f7fbff','#fff8f4'];
+const centerDirections=[-90,30,150];
+const slots=centerDirections.map((a,i)=>{const t=rad(a);return Object.freeze({slot:i,cx:O.x+R*Math.cos(t),cy:O.y+R*Math.sin(t),base:a+180});});
+const HEX_BASE=slots[0].base; // Los tres huecos tienen el mismo contorno, girado 120°.
+const pieces=slots.map((_,i)=>({name:String.fromCharCode(65+i),rotation:0,index:i,slot:i}));
+
+// Posiciones 1, 2 y 3: centros de los segmentos 7, 8 y 9,
+// contando desde el vértice central O hacia el exterior.
+const POS={1:.65,2:.75,3:.85};
+const sharedRays=[-30,90,210]; // AB, BC, CA
+const sharedValues=[2,3,1];    // puntos de la circunferencia ganadora
+
+function rad(d){return d*Math.PI/180}
+function rotPoint(v,deg){const a=rad(deg),c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function pointOnRay(angleDeg,value){const d=R*POS[value],a=rad(angleDeg);return{x:O.x+d*Math.cos(a),y:O.y+d*Math.sin(a)}}
+function circleThrough3(a,b,c){
+  const d=2*(a.x*(b.y-c.y)+b.x*(c.y-a.y)+c.x*(a.y-b.y));
+  const aa=a.x*a.x+a.y*a.y,bb=b.x*b.x+b.y*b.y,cc=c.x*c.x+c.y*c.y;
+  const x=(aa*(b.y-c.y)+bb*(c.y-a.y)+cc*(a.y-b.y))/d;
+  const y=(aa*(c.x-b.x)+bb*(a.x-c.x)+cc*(b.x-a.x))/d;
+  return{x,y,r:dist({x,y},a)};
+}
+function reflectAcrossRay(pt,origin,angleDeg){
+  const q=rotPoint({x:pt.x-origin.x,y:pt.y-origin.y},-angleDeg);
+  const w=rotPoint({x:q.x,y:-q.y},angleDeg);
+  return{x:origin.x+w.x,y:origin.y+w.y};
+}
+function pieceCenter(p){return slots[p.slot]}
+function vertices(p){const {cx,cy}=pieceCenter(p),pts=[],start=rad(HEX_BASE+p.rotation);for(let i=0;i<6;i++){const a=start+i*Math.PI/3;pts.push({x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)});}return pts}
+function pathPoly(pts){ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath()}
+function inside(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a.y>pt.y)!=(b.y>pt.y))&&(pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x))c=!c;}return c}
+
+// Una única circunferencia ganadora pasa por los tres puntos compartidos.
+const winPts=sharedRays.map((a,i)=>pointOnRay(a,sharedValues[i]));
+const solutionCircle=circleThrough3(...winPts);
+
+// Cada pieza, en orientación de solución, ve dos de esos tres rayos.
+const pieceEdges=[[-30,210],[-30,90],[90,210]];
+const winnerPairs=[[2,1],[2,3],[3,1]];
+const concentricValues=[1,2,3];
+
+const curveDefs=pieces.map((p,i)=>{
+  const edges=pieceEdges[i];
+  const winner={type:'ganadora',pair:`${winnerPairs[i][0]}–${winnerPairs[i][1]}`,activeRotation:0,circle:solutionCircle,
+    endpoints:[pointOnRay(edges[0],winnerPairs[i][0]),pointOnRay(edges[1],winnerPairs[i][1])]};
+
+  // Reflejo exacto del arco ganador respecto a la bisectriz del vértice central.
+  let bisector;
+  if(i===0) bisector=-90; else if(i===1) bisector=30; else bisector=150;
+  const mc=reflectAcrossRay(solutionCircle,O,bisector);
+  const mirror={type:'equivalente',pair:`${winnerPairs[i][1]}–${winnerPairs[i][0]}`,activeRotation:240,circle:{x:mc.x,y:mc.y,r:solutionCircle.r},
+    endpoints:[pointOnRay(edges[0],winnerPairs[i][1]),pointOnRay(edges[1],winnerPairs[i][0])]};
+
+  const v=concentricValues[i];
+  const concentric={type:'concéntrica',pair:`${v}–${v}`,activeRotation:120,circle:{x:O.x,y:O.y,r:R*POS[v]},
+    endpoints:[pointOnRay(edges[0],v),pointOnRay(edges[1],v)]};
+  return[winner,mirror,concentric];
+});
+
+// Guarda la geometría de cada ficha en un sistema local e inmutable.
+// Cada curva se "rebobina" desde la rotación en la que ocupa el vértice central
+// hasta la orientación física 0° de su propia pieza.
+for(const p of pieces){
+  const home=slots[p.index];
+  for(const d of curveDefs[p.index]){
+    const undo=-d.activeRotation;
+    d.localCenter=rotPoint({x:d.circle.x-home.cx,y:d.circle.y-home.cy},undo);
+    d.localEnds=d.endpoints.map(e=>rotPoint({x:e.x-home.cx,y:e.y-home.cy},undo));
+    const c=d.circle,e0=d.endpoints[0],e1=d.endpoints[1];
+    d.a0=Math.atan2(e0.y-c.y,e0.x-c.x);
+    d.a1=Math.atan2(e1.y-c.y,e1.x-c.x);
+    d.localA0=d.a0-rad(d.activeRotation);
+    d.localA1=d.a1-rad(d.activeRotation);
+    // Elegimos el arco cuya mitad queda dentro del hexágono activo.
+    const poly=vertices({...p,slot:p.index,rotation:d.activeRotation});
+    const midCW=(d.a0+((d.a1-d.a0+Math.PI*2)%(Math.PI*2))/2);
+    const midCCW=(d.a0-((d.a0-d.a1+Math.PI*2)%(Math.PI*2))/2);
+    const m1={x:c.x+c.r*Math.cos(midCW),y:c.y+c.r*Math.sin(midCW)};
+    const m2={x:c.x+c.r*Math.cos(midCCW),y:c.y+c.r*Math.sin(midCCW)};
+    d.ccw=inside(m2,poly)&&!inside(m1,poly);
+  }
+}
+
+function activeSlot(p){return p.rotation===0?0:p.rotation===120?2:1}
+function curveWorld(p,slot){
+  const d=curveDefs[p.index][slot],{cx,cy}=pieceCenter(p);
+  const lc=rotPoint(d.localCenter,p.rotation);
+  const c={x:cx+lc.x,y:cy+lc.y};
+  const ends=d.localEnds.map(e=>{const q=rotPoint(e,p.rotation);return{x:cx+q.x,y:cy+q.y}});
+  const rot=rad(p.rotation);
+  return{data:d,circle:{x:c.x,y:c.y,r:d.circle.r},ends,a0:d.localA0+rot,a1:d.localA1+rot,ccw:d.ccw};
+}
+
+function drawArc(p,slot){
+  const poly=vertices(p),g=curveWorld(p,slot),d=g.data;
+  ctx.save();pathPoly(poly);ctx.clip();
+  ctx.beginPath();ctx.arc(g.circle.x,g.circle.y,g.circle.r,g.a0,g.a1,g.ccw);
+  let color='#242422',dash=[];
+  if(state.classify){
+    if(d.type==='ganadora')color='#0f766e';
+    else if(d.type==='equivalente'){color='#b45309';dash=[18,10]}
+    else{color='#6b7280';dash=[5,11]}
+  }
+  ctx.strokeStyle=color;ctx.lineWidth=LINE;ctx.lineCap='butt';ctx.setLineDash(dash);ctx.stroke();ctx.restore();
+
+  if(state.guides){
+    ctx.save();ctx.strokeStyle='rgba(109,40,217,.20)';ctx.lineWidth=1.2;ctx.setLineDash([5,6]);
+    ctx.beginPath();ctx.arc(g.circle.x,g.circle.y,g.circle.r,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#6d28d9';ctx.beginPath();ctx.arc(g.circle.x,g.circle.y,3.5,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+}
+
+function drawEdgeScale(p){
+  if(!state.guides)return;
+  const poly=vertices(p);
+  // Solo marcamos las dos aristas que llegan al vértice central actual.
+  let oi=0,best=Infinity;for(let i=0;i<6;i++){const d=dist(poly[i],O);if(d<best){best=d;oi=i}}
+  const V=poly[oi],neighbors=[poly[(oi+5)%6],poly[(oi+1)%6]];
+  for(const E of neighbors){
+    ctx.save();ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let s=1;s<=10;s++){
+      const f=(s-.5)/10,x=V.x+(E.x-V.x)*f,y=V.y+(E.y-V.y)*f;
+      const dx=E.x-V.x,dy=E.y-V.y,L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;
+      ctx.strokeStyle=s>=7&&s<=9?'rgba(109,40,217,.55)':'rgba(60,55,48,.18)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x-nx*5,y-ny*5);ctx.lineTo(x+nx*5,y+ny*5);ctx.stroke();
+      if(s>=7&&s<=9){const val=s-6;ctx.fillStyle='#6d28d9';ctx.fillText(String(val),x+nx*14,y+ny*14)}
+    }
+    ctx.restore();
+  }
+}
+
+function drawPiece(p){
+  const {cx,cy}=pieceCenter(p),poly=vertices(p);ctx.save();pathPoly(poly);ctx.fillStyle=fills[p.index];ctx.fill();ctx.strokeStyle='#242422';ctx.lineWidth=3;ctx.stroke();ctx.restore();
+  for(let slot=0;slot<3;slot++)drawArc(p,slot);
+  drawEdgeScale(p);
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,24,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.94)';ctx.fill();ctx.strokeStyle='#c8c1b5';ctx.stroke();ctx.fillStyle='#222';ctx.font='700 18px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.name,cx,cy+1);ctx.restore();
+  ctx.save();ctx.fillStyle='#6f6960';ctx.font='600 14px system-ui';ctx.textAlign='center';ctx.fillText('↻ 120°',cx,cy+45);ctx.restore();
+  if(state.classify){const d=curveDefs[p.index][activeSlot(p)];ctx.save();ctx.font='600 14px system-ui';ctx.textAlign='center';ctx.fillStyle=d.type==='ganadora'?'#0f766e':d.type==='equivalente'?'#b45309':'#6b7280';ctx.fillText(`${d.pair} · ${d.type}`,cx,cy+68);ctx.restore();}
+  if(state.selected===p.index){
+    ctx.save();pathPoly(poly);ctx.strokeStyle='rgba(109,40,217,.85)';ctx.lineWidth=5;ctx.lineJoin='round';ctx.shadowColor='rgba(109,40,217,.28)';ctx.shadowBlur=14;ctx.stroke();ctx.restore();
+  }
+}
+
+function endpointOnSharedRay(curve,angle){
+  const a=rad(angle),ux=Math.cos(a),uy=Math.sin(a);let best=null;
+  for(const e of curve.ends){
+    const vx=e.x-O.x,vy=e.y-O.y,t=vx*ux+vy*uy,off=Math.abs(vx*uy-vy*ux);
+    if(t>=0&&off<4&&(best===null||off<best.off))best={t,off};
+  }
+  return best?best.t:null;
+}
+function edgeMatches(){
+  const ordered=[...pieces].sort((a,b)=>a.slot-b.slot); const curves=ordered.map((p)=>curveWorld(p,activeSlot(p)));
+  const pairs=[[0,1],[1,2],[2,0]];
+  return pairs.map((pair,i)=>{
+    const a=endpointOnSharedRay(curves[pair[0]],sharedRays[i]);
+    const b=endpointOnSharedRay(curves[pair[1]],sharedRays[i]);
+    const diff=(a==null||b==null)?Infinity:Math.abs(a-b);
+    const steps=Number.isFinite(diff)?Math.round(diff/(R/10)):99;
+    return{pair,angle:sharedRays[i],a,b,diff,steps,ok:diff<1.5,near:diff<LINE*1.25};
+  });
+}
+function solved(){return edgeMatches().every(e=>e.ok)}
+function drawBoundaryFeedback(matches){
+  for(const e of matches){
+    const a=rad(e.angle),x=O.x+R*.47*Math.cos(a),y=O.y+R*.47*Math.sin(a);
+    ctx.save();ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle=e.ok?'#0f766e':e.steps===1?'#b45309':'#9ca3af';ctx.fill();ctx.restore();
+  }
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#eee8dc';ctx.fillRect(0,0,W,H);
+  const matches=edgeMatches();
+  if(state.guides){ctx.save();for(const a of sharedRays){const t=rad(a);ctx.beginPath();ctx.moveTo(O.x,O.y);ctx.lineTo(O.x+R*Math.cos(t),O.y+R*Math.sin(t));ctx.strokeStyle='rgba(31,41,55,.20)';ctx.lineWidth=1.5;ctx.setLineDash([5,7]);ctx.stroke();}ctx.restore();}
+  [...pieces].sort((a,b)=>a.slot-b.slot).forEach(drawPiece);
+  ctx.save();ctx.beginPath();ctx.arc(O.x,O.y,7,0,Math.PI*2);ctx.fillStyle=solved()?'#0f766e':'#6d28d9';ctx.fill();ctx.fillStyle='#222';ctx.font='600 15px system-ui';ctx.fillText('O',O.x+12,O.y+20);ctx.restore();
+  const active=pieces.map(p=>curveDefs[p.index][activeSlot(p)].pair).join(' + ');
+  const exact=matches.filter(e=>e.ok).length,one=matches.filter(e=>e.steps===1).length,two=matches.filter(e=>e.steps===2).length;
+  const selected=state.selected===null?'ninguno':pieces.find(p=>p.index===state.selected).name;
+  document.getElementById('status').innerHTML=solved()
+    ?`<strong>Circunferencia ganadora.</strong> ${active}: las tres uniones ocupan exactamente la misma posición de segmento. Movimientos: <strong>${state.moves}</strong>.`
+    :`<strong>Seleccionado:</strong> ${selected}. <strong>Movimientos:</strong> ${state.moves}. Combinación central: ${active}. Uniones exactas: <strong>${exact}/3</strong>. Desfase de un segmento: <strong>${one}</strong>. Desfase de dos segmentos: <strong>${two}</strong>.`;
+}
+
+function pointer(ev){const r=canvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*W/r.width,y:(ev.clientY-r.top)*H/r.height}}
+function selectedPiece(){return pieces.find(p=>p.index===state.selected)||null}
+function rotateSelected(direction){
+  const p=selectedPiece();if(!p)return;
+  p.rotation=(p.rotation+(direction>0?120:240))%360;
+  state.moves++;draw();
+}
+function selectOrSwap(p){
+  if(state.selected===null){state.selected=p.index;draw();return}
+  const first=selectedPiece();
+  if(first.index===p.index){draw();return}
+  // Las fichas son rígidas: intercambiamos únicamente sus huecos.
+  // Su rotación y toda su geometría local permanecen intactas.
+  [first.slot,p.slot]=[p.slot,first.slot];
+  state.selected=null;state.moves++;draw();
+}
+canvas.addEventListener('pointerdown',e=>{
+  const q=pointer(e);
+  const p=[...pieces].sort((a,b)=>b.slot-a.slot).find(x=>inside(q,vertices(x)));
+  if(p)selectOrSwap(p);
+  canvas.focus();
+});
+canvas.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft'){e.preventDefault();rotateSelected(-1)}
+  else if(e.key==='ArrowRight'){e.preventDefault();rotateSelected(1)}
+  else if(e.key==='Tab'){
+    e.preventDefault();
+    const ordered=[...pieces].sort((a,b)=>a.slot-b.slot);
+    const current=ordered.findIndex(p=>p.index===state.selected);
+    const step=e.shiftKey?-1:1;
+    state.selected=ordered[(current+step+ordered.length)%ordered.length].index;
+    draw();
+  }
+});
+document.getElementById('left').addEventListener('click',()=>rotateSelected(-1));
+document.getElementById('right').addEventListener('click',()=>rotateSelected(1));
+function shuffle(array){
+  for(let i=array.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [array[i],array[j]]=[array[j],array[i]];
+  }
+  return array;
+}
+function scramble(){
+  do{
+    const slots=shuffle([0,1,2]);
+    pieces.forEach((p,i)=>{
+      p.slot=slots[i];
+      p.rotation=120*Math.floor(Math.random()*3);
+    });
+  }while(solved());
+  state.selected=null;state.moves=0;draw();
+}
+document.getElementById('mix').addEventListener('click',scramble);
+document.getElementById('solve').addEventListener('click',()=>{
+  pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
+  state.selected=null;state.moves=0;draw();
+});
+document.getElementById('reset').addEventListener('click',()=>{
+  pieces.forEach((p,i)=>{p.slot=i;p.rotation=0});
+  state.guides=false;state.classify=false;state.selected=null;state.moves=0;
+  document.getElementById('guides').checked=false;document.getElementById('classify').checked=false;draw();
+});
+document.getElementById('guides').addEventListener('change',e=>{state.guides=e.target.checked;draw()});
+document.getElementById('classify').addEventListener('change',e=>{state.classify=e.target.checked;draw()});
+scramble();
+})();
+</script>
+</body>
+</html>
