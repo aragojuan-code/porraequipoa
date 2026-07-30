@@ -26,6 +26,9 @@ const POS={1:.65,2:.75,3:.85};
 const PIECE_FILL='#fffaf0';
 const PIECE_STROKE='#282725';
 const TABLE_FILL='#f2eee6';
+// Imán sutil entre aristas: corto alcance y fácil de separar.
+const MAGNET_DISTANCE=18;      // píxeles de modelo antes de aplicar scale
+const MAGNET_ANGLE=7*Math.PI/180;
 let W=0,H=0,DPR=1,scale=1;
 
 function rad(d){return d*Math.PI/180}
@@ -197,6 +200,51 @@ function draw(){
 
 function project(poly,axis){let min=Infinity,max=-Infinity;for(const p of poly){const v=p.x*axis.x+p.y*axis.y;min=Math.min(min,v);max=Math.max(max,v)}return{min,max}}
 function polygonCenter(poly){let x=0,y=0;for(const p of poly){x+=p.x;y+=p.y}return{x:x/poly.length,y:y/poly.length}}
+function normAngle(a){while(a>Math.PI)a-=TAU;while(a<-Math.PI)a+=TAU;return a}
+function polygonEdges(poly){return poly.map((a,i)=>{
+  const b=poly[(i+1)%poly.length];
+  return{a,b,mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},angle:Math.atan2(b.y-a.y,b.x-a.x)};
+})}
+// Si dos aristas están ya muy cerca y casi alineadas, las hace coincidir.
+// El alcance es pequeño, por lo que basta arrastrar con normalidad para separarlas.
+function applyEdgeMagnet(active){
+  const activePoly=pieceVertices(active);
+  const activeEdges=polygonEdges(activePoly);
+  const capture=MAGNET_DISTANCE*scale;
+  let best=null;
+  for(const other of pieces){
+    if(other===active)continue;
+    const otherPoly=pieceVertices(other);
+    const otherEdges=polygonEdges(otherPoly);
+    for(let i=0;i<activeEdges.length;i++)for(let j=0;j<otherEdges.length;j++){
+      const ea=activeEdges[i],eb=otherEdges[j];
+      // Dos contornos recorridos en el mismo sentido deben enfrentar sus aristas
+      // con direcciones opuestas.
+      const da=normAngle(eb.angle+Math.PI-ea.angle);
+      if(Math.abs(da)>MAGNET_ANGLE)continue;
+      const rel={x:ea.mid.x-active.x,y:ea.mid.y-active.y};
+      const relRot=rot(rel,da);
+      const rotatedMid={x:active.x+relRot.x,y:active.y+relRot.y};
+      const dx=eb.mid.x-rotatedMid.x,dy=eb.mid.y-rotatedMid.y;
+      const travel=Math.hypot(dx,dy);
+      if(travel>capture)continue;
+      const tx=active.x+dx,ty=active.y+dy,tr=active.rotation+da;
+      const candidate=pieceVertices(active,tx,ty,tr);
+      // Los centros deben quedar a lados opuestos de la arista común.
+      const ex=eb.b.x-eb.a.x,ey=eb.b.y-eb.a.y;
+      const sideA=ex*(ty-eb.mid.y)-ey*(tx-eb.mid.x);
+      const sideB=ex*(other.y-eb.mid.y)-ey*(other.x-eb.mid.x);
+      if(sideA*sideB>=0)continue;
+      // Rechaza cualquier montaje que aún produzca penetración apreciable.
+      const overlap=satMTV(candidate,otherPoly);
+      if(overlap&&Math.hypot(overlap.x,overlap.y)>1.8)continue;
+      const score=travel+Math.abs(da)*MODEL_R*scale*.7;
+      if(!best||score<best.score)best={x:tx,y:ty,rotation:tr,score};
+    }
+  }
+  if(best){active.x=best.x;active.y=best.y;active.rotation=best.rotation;return true}
+  return false;
+}
 // Devuelve el vector mínimo que debe aplicarse a B para separarlo de A.
 function satMTV(polyA,polyB){
   let smallest=Infinity,bestAxis=null;
@@ -316,6 +364,7 @@ canvas.addEventListener('pointermove',e=>{
     while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;
     p.rotation=gesture.startRotation+da;
   }
+  applyEdgeMagnet(p);
   keepInside(p);pushOthers(p);draw();e.preventDefault();
 });
 function endPointer(e){
