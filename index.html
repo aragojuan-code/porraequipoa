@@ -64,39 +64,53 @@ function canonicalVertices(home,rotation=0){const pts=[];for(let i=0;i<6;i++){
 const winPts=sharedRays.map((a,i)=>pointOnRay(a,sharedValues[i]));
 const solutionCircle=circleThrough3(...winPts);
 const pieceEdges=[[-30,210],[-30,90],[90,210]].map(pair=>pair.map(rad));
-const physicalWinnerPairs=[[2,1],[2,3],[3,1]];
-const physicalEquivalentPairs=[[1,2],[1,2],[2,3]];
-const concentricValues=[1,2,3];
+const physicalWinnerPairs=[[1,2],[2,3],[3,1]];
 
+// Nueva combinatoria, con una sola familia cerrada:
+// A: 1-2, 2-1, 3-3
+// B: 2-3, 1-1, 2-2
+// C: 3-1, 1-3, 2-2
 const curveDefs=homes.map((home,i)=>{
   const edges=pieceEdges[i];
-  const wp=physicalWinnerPairs[i];
-  const winner={
+  const makeWinner=(pair)=>({
     activeRotation:0,
     circle:{...solutionCircle},
-    endpoints:[pointOnRay(edges[0],wp[0]),pointOnRay(edges[1],wp[1])]
+    endpoints:[pointOnRay(edges[0],pair[0]),pointOnRay(edges[1],pair[1])]
+  });
+  const makeConcentric=(value,activeRotation)=>({
+    activeRotation,
+    circle:{x:0,y:0,r:MODEL_R*POS[value]},
+    endpoints:[pointOnRay(edges[0],value),pointOnRay(edges[1],value)]
+  });
+  const makeMirror=(pair,activeRotation)=>{
+    const bisectors=[rad(-90),rad(30),rad(150)];
+    const g=reflectAcrossRay(solutionCircle,O,bisectors[i]);
+    return{
+      activeRotation,
+      circle:{x:g.x,y:g.y,r:solutionCircle.r},
+      endpoints:[pointOnRay(edges[0],pair[0]),pointOnRay(edges[1],pair[1])]
+    };
   };
-  let equivalentCircle;
+
   if(i===0){
-    const g=reflectAcrossRay(solutionCircle,O,rad(-90));
-    equivalentCircle={x:g.x,y:g.y,r:solutionCircle.r};
-  }else{
-    const g=rotateAround(solutionCircle,O,rad(120));
-    equivalentCircle={x:g.x,y:g.y,r:solutionCircle.r};
+    return[
+      makeWinner([1,2]),
+      makeMirror([2,1],rad(240)),
+      makeConcentric(3,rad(120))
+    ];
   }
-  const ep=physicalEquivalentPairs[i];
-  const equivalent={
-    activeRotation:rad(240),
-    circle:equivalentCircle,
-    endpoints:[pointOnRay(edges[0],ep[0]),pointOnRay(edges[1],ep[1])]
-  };
-  const v=concentricValues[i];
-  const concentric={
-    activeRotation:rad(120),
-    circle:{x:0,y:0,r:MODEL_R*POS[v]},
-    endpoints:[pointOnRay(edges[0],v),pointOnRay(edges[1],v)]
-  };
-  return[winner,equivalent,concentric];
+  if(i===1){
+    return[
+      makeWinner([2,3]),
+      makeConcentric(1,rad(120)),
+      makeConcentric(2,rad(240))
+    ];
+  }
+  return[
+    makeWinner([3,1]),
+    makeMirror([1,3],rad(240)),
+    makeConcentric(2,rad(120))
+  ];
 });
 
 // Convertimos una sola vez cada curva a coordenadas locales rígidas de su ficha.
