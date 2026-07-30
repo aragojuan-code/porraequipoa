@@ -134,23 +134,23 @@ curveDefs.forEach((defs,i)=>{
 });
 
 const pieces=[
-  {index:0,x:0,y:0,rotation:rad(-17)},
-  {index:1,x:0,y:0,rotation:rad(28)},
-  {index:2,x:0,y:0,rotation:rad(-39)}
+  {index:0,x:0,y:0,rotation:rad(31)},
+  {index:1,x:0,y:0,rotation:rad(-26)},
+  {index:2,x:0,y:0,rotation:rad(143)}
 ];
 let drawOrder=[0,1,2];
 let initialized=false;
 
 function setInitialPositions(){
-  const r=MODEL_R*scale;
-  pieces[0].x=W*.27; pieces[0].y=H*.36; pieces[0].rotation=rad(-17);
-  pieces[1].x=W*.69; pieces[1].y=H*.34; pieces[1].rotation=rad(28);
-  pieces[2].x=W*.50; pieces[2].y=H*.72; pieces[2].rotation=rad(-39);
-  // En pantallas estrechas reducimos un poco la separación manteniendo las piezas sueltas.
+  // Más desorden inicial: intercambiamos A y B y abrimos más el triángulo.
+  pieces[0].x=W*.72; pieces[0].y=H*.32; pieces[0].rotation=rad(31);
+  pieces[1].x=W*.26; pieces[1].y=H*.40; pieces[1].rotation=rad(-26);
+  pieces[2].x=W*.55; pieces[2].y=H*.73; pieces[2].rotation=rad(143);
+  // En pantallas estrechas mantenemos una disposición claramente desordenada, pero bien dentro del tablero.
   if(W<650){
-    pieces[0].x=W*.28; pieces[0].y=H*.30;
-    pieces[1].x=W*.70; pieces[1].y=H*.42;
-    pieces[2].x=W*.38; pieces[2].y=H*.73;
+    pieces[0].x=W*.72; pieces[0].y=H*.34; pieces[0].rotation=rad(31);
+    pieces[1].x=W*.28; pieces[1].y=H*.38; pieces[1].rotation=rad(-26);
+    pieces[2].x=W*.46; pieces[2].y=H*.71; pieces[2].rotation=rad(143);
   }
   pieces.forEach(p=>keepInside(p));
   separateAll();
@@ -197,11 +197,16 @@ function drawPiece(p){
   ctx.clip();
   for(const d of curveDefs[p.index]){
     const c=transformLocal(p,d.localCenter);
+    const r=d.circle.r*scale;
+    const edgeBleed=Math.min(0.12,(LINE*.62)/Math.max(1,d.circle.r));
+    let a0=d.localA0+p.rotation, a1=d.localA1+p.rotation;
+    if(d.ccw){a0+=edgeBleed; a1-=edgeBleed;}
+    else {a0-=edgeBleed; a1+=edgeBleed;}
     ctx.beginPath();
-    ctx.arc(c.x,c.y,d.circle.r*scale,d.localA0+p.rotation,d.localA1+p.rotation,d.ccw);
+    ctx.arc(c.x,c.y,r,a0,a1,d.ccw);
     ctx.strokeStyle='#222220';
     ctx.lineWidth=LINE*scale;
-    ctx.lineCap='butt';
+    ctx.lineCap='square';
     ctx.stroke();
   }
   ctx.restore();
